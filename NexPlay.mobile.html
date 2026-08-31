@@ -3597,7 +3597,8 @@
             { id: 'all', label: 'All' },
             { id: 'audio', label: 'Audio' },
             { id: 'videos', label: 'Video' },
-            { id: 'favorites', label: 'Favorites' }
+            { id: 'favorites', label: 'Favorites' },
+            { id: 'playlists', label: 'Playlists' }
         ]);
         const MOBILE_ALLOWED_TABS = new Set(['all', 'audio', 'videos', 'favorites', 'playlists', 'online-music', 'settings']);
         const MOBILE_SORT_OPTIONS = Object.freeze([
@@ -3942,6 +3943,8 @@
             isSidebarOpen: false, // Default closed on mobile
             playbackSpeed: 1.0,
             sleepTimer: null,
+            sleepTimerEndsAt: 0,
+            sleepTimerMinutes: 0,
             dragCounter: 0,
             metadataQueue: [],
             processingQueue: false,
@@ -15962,20 +15965,48 @@ isQueueOverlayOpen: false
 
         function setSleepTimer(min) {
             if(state.sleepTimer) clearTimeout(state.sleepTimer);
+            state.sleepTimer = null;
+            state.sleepTimerEndsAt = 0;
+            state.sleepTimerMinutes = 0;
             const smenu = document.getElementById('sleep-menu');
             if (smenu) {
                 smenu.classList.remove('menu-open');
                 setTimeout(() => smenu.classList.add('hidden'), 200);
             }
-            els.sleepLabel.textContent = min === 0 ? 'Sleep' : `${min}m`;
-            if(min > 0) {
+            // The mobile shell has no #sleep-label, so this must stay optional.
+            if (els.sleepLabel) els.sleepLabel.textContent = min === 0 ? 'Sleep' : `${min}m`;
+            const minutes = Math.max(0, Number(min) || 0);
+            if(minutes > 0) {
+                state.sleepTimerEndsAt = Date.now() + minutes * 60000;
+                state.sleepTimerMinutes = minutes;
                 state.sleepTimer = setTimeout(() => {
-                    els.audio.pause();
+                    state.sleepTimer = null;
+                    state.sleepTimerEndsAt = 0;
+                    state.sleepTimerMinutes = 0;
+                    // Pause whichever transport is live, not just the local element.
+                    if (typeof pauseActivePlaybackTransport === 'function') {
+                        pauseActivePlaybackTransport({ captureProgress: true });
+                    } else if (els.audio) {
+                        els.audio.pause();
+                    }
                     state.isPlaying = false;
                     updatePlayIcons();
-                    els.sleepLabel.textContent = 'Sleep';
-                }, min * 60000);
+                    if (els.sleepLabel) els.sleepLabel.textContent = 'Sleep';
+                    showToast('Sleep timer ended playback.', 'info');
+                    syncSleepTimerSurface();
+                }, minutes * 60000);
             }
+            syncSleepTimerSurface();
+        }
+
+        function getSleepTimerRemainingMinutes() {
+            const endsAt = Number(state.sleepTimerEndsAt || 0);
+            if (!endsAt) return 0;
+            return Math.max(0, Math.ceil((endsAt - Date.now()) / 60000));
+        }
+
+        function syncSleepTimerSurface() {
+            if (state.activeTab === 'settings') renderSettingsTab();
         }
 
         async function togglePiP() {
@@ -17785,6 +17816,17 @@ isQueueOverlayOpen: false
                     `setAppSettingValue('appearance','density','${mode}', { rerenderSettings: true })`
                 ))
                 .join('');
+            const sleepTimerRemaining = getSleepTimerRemainingMinutes();
+            const sleepTimerChoices = [0, 15, 30, 45, 60]
+                .map((minutes) => renderMobileChoiceChip(
+                    minutes === 0 ? 'Off' : `${minutes}m`,
+                    Number(state.sleepTimerMinutes || 0) === minutes,
+                    `setSleepTimer(${minutes})`
+                ))
+                .join('');
+            const sleepTimerStatusLabel = sleepTimerRemaining > 0
+                ? `Playback stops in about ${sleepTimerRemaining} minute${sleepTimerRemaining === 1 ? '' : 's'}.`
+                : 'Pause playback automatically after a set time.';
             const viewChoices = ['list', 'grid']
                 .map((mode) => renderMobileChoiceChip(
                     `${mode} view`,
@@ -17821,6 +17863,11 @@ isQueueOverlayOpen: false
                             ${renderMobileSettingsToggle('Background playback', 'Keep songs playing while NexPlay stays open in the background, like a phone music app.', playbackPrefs.backgroundPlayback !== false, `setAppSettingValue('playback','backgroundPlayback', this.checked, { rerenderSettings: true })`)}
                         </div>
                         <p class="mt-3 text-[11px] leading-5 text-gray-500">${escapeHtml(ONLINE_BACKGROUND_PLAYBACK_NOTE)}</p>
+                        <div class="mt-4">
+                            <div class="text-sm font-bold text-white">Sleep timer</div>
+                            <div class="mt-1 text-[11px] leading-5 text-gray-500">${escapeHtml(sleepTimerStatusLabel)}</div>
+                            <div class="mt-3 flex flex-wrap gap-2">${sleepTimerChoices}</div>
+                        </div>
                         <label class="block mt-4 text-sm font-bold text-white">
                             Seek step
                             <select class="mobile-settings-select" onchange="setAppSettingValue('playback','seekStepSeconds', Number(this.value), { rerenderSettings: true })">
