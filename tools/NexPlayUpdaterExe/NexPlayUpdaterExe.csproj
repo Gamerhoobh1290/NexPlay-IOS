@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>NexPlayUpdater</AssemblyName>
+    <RootNamespace>NexPlayUpdater</RootNamespace>
+    <ApplicationIcon>..\..\NexPlay_N_final_256.ico</ApplicationIcon>
+    <Product>NexPlay Updater</Product>
+    <Version>2.2.1.0</Version>
+    <InformationalVersion>2.2.1.0</InformationalVersion>
+    <AssemblyVersion>2.2.1.0</AssemblyVersion>
+    <FileVersion>2.2.1.0</FileVersion>
+    <TargetPlatformMoniker>Windows,Version=7.0</TargetPlatformMoniker>
+    <TargetPlatformDisplayName>Windows 7</TargetPlatformDisplayName>
+  </PropertyGroup>
+</Project>

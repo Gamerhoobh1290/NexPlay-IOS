@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Build and release output
+dist/
+dist-*/
+output/
+
+# Local caches and test output
+.netlify/
+.playwright-cli/
+.nexplay-validation-profile*/
+.nexplay-updater-integration*/
+test-results/
+tmp-*/
+
+# Android local/build output
+android/.gradle/
+android/app/build/
+android/local.properties
+android/.idea/workspace.xml
+
+# .NET build output
+tools/**/bin/
+tools/**/obj/
+
+# Temporary extraction/debug files
+.backup_script_*.js
+.extract_*.js
+.rep_*.js
+.slice_*.js
+.snippet_*.js
+.tmp_*.js
+.tmp_script_*.js
+.tmp_slice.js
+.nexplay_script_tmp.js
+.script2.js
+playwright-*.png
+
+# Local test media and HTML backups
+Audio files for testing/
+_nexplay_test_audio*.mp3
+NexPlay - Copy*.html
+NexPlay*BACKUP*.html
+NexPlay.broken_blank_*.html
+NexPlay.stable_restore_*.html
+TestBACKUP.html
+*.bak_feature_work

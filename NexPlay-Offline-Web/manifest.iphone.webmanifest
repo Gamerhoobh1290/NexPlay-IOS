@@ -1,0 +1,18 @@
+﻿{
+    "name":  "NexPlay Offline",
+    "short_name":  "NexPlay Offline",
+    "description":  "NexPlay standalone offline mobile web edition",
+    "start_url":  "./NexPlay.mobile.html",
+    "scope":  "./",
+    "icons":  [
+                  {
+                      "src":  "./nexplay-icon-brand.png",
+                      "sizes":  "256x256",
+                      "type":  "image/png",
+                      "purpose":  "any"
+                  }
+              ],
+    "display":  "standalone",
+    "background_color":  "#050505",
+    "theme_color":  "#06b6d4"
+}

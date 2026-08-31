@@ -1,0 +1,10 @@
+{
+  "name": "NexPlay",
+  "short_name": "NexPlay",
+  "description": "NexPlay local-first media workstation",
+  "start_url": "./NexPlay.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#06b6d4"
+}

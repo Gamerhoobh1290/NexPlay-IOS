@@ -1,0 +1,67 @@
+/* NexPlay base styles: global variables, document defaults, and primitive controls. */
+
+:root {
+    --accent-color: #06b6d4; /* Cyan Default */
+    --accent-glow: rgba(6, 182, 212, 0.6);
+    --bg-deep: #050505;
+    --beat-intensity: 0;
+    --mood-bias: 0;
+    --mood-intensity: 0;
+    --sidebar-width: 18rem;
+    --visualizer-intensity: 1;
+    --video-lyric-safe-offset: 160px;
+}
+
+
+
+body {
+    background-color: var(--bg-deep);
+    color: #e2e8f0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    font-family: 'Outfit', sans-serif;
+}
+
+
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: calc(0.08 + (var(--beat-intensity) * 0.32) + (var(--mood-intensity) * 0.12));
+    background: radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb, 6, 182, 212), 0.18), transparent 58%);
+    transition: opacity 180ms linear;
+}
+
+
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+
+
+::-webkit-scrollbar-track { background: transparent; }
+
+
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+
+::-webkit-scrollbar-thumb:hover { background: var(--accent-color); }
+
+
+
+/* Inputs */
+input[type=range] { -webkit-appearance: none; background: transparent; height: 4px; cursor: pointer; }
+
+
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%;
+    background: #fff; box-shadow: 0 0 15px var(--accent-color); margin-top: -6px;
+    transition: transform 0.2s;
+}
+
+
+input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.5); }
+
+
+input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; }

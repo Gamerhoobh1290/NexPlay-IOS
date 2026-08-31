@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <StartupObject>NexPlayUpdaterSafetyTests.SafetyTestProgram</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\NexPlayUpdaterExe\Program.cs" Link="UpdaterProgram.cs" />
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+</Project>

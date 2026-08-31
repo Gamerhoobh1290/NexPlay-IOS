@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "checkJs": true,
+    "allowJs": true,
+    "noEmit": true,
+    "lib": ["DOM", "ES2022"],
+    "types": ["node"]
+  },
+  "include": ["nexplay-next/**/*.js", "nexplay-next/**/*.d.ts", "nexplay-next/**/*.d.cts", "tests/**/*.mjs"]
+}

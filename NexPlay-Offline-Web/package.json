@@ -1,0 +1,63 @@
+{
+  "name": "nexplay-offline-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone offline web edition of NexPlay.",
+  "main": "electron-main.cjs",
+  "author": "NexPlay",
+  "scripts": {
+    "start": "node ./tools/offline-server.mjs",
+    "serve": "node ./tools/offline-server.mjs",
+    "start:desktop": "electron .",
+    "make:icon": "powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/create-offline-icon.ps1",
+    "dist:win": "electron-builder --win nsis portable"
+  },
+  "devDependencies": {
+    "electron": "34.3.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.nexplay.offline",
+    "productName": "NexPlay Offline",
+    "directories": {
+      "output": "dist-installer"
+    },
+    "files": [
+      "404.html",
+      "NexPlay.html",
+      "NexPlay.mobile.html",
+      "index.html",
+      "manifest.webmanifest",
+      "manifest.iphone.webmanifest",
+      "tailwind.generated.css",
+      "sw.js",
+      "electron-main.cjs",
+      "package.json",
+      "README.md",
+      "assets/**/*",
+      "offline/**/*",
+      "vendor/**/*",
+      "nexplay-next/audio-queue-engine.cjs",
+      "nexplay-next/legacy-online-music-helpers.cjs"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/nexplay-offline-icon.ico"
+    },
+    "nsis": {
+      "artifactName": "NexPlay Offline Setup ${version} ${arch}.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NexPlay Offline"
+    },
+    "portable": {
+      "artifactName": "NexPlay Offline Portable ${version} ${arch}.${ext}"
+    }
+  }
+}

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexPlay</title>
+    <link rel="icon" href="/assets/NexPlay_N_final_256.ico" type="image/x-icon">
+    <script>
+        (() => {
+            const nav = window.navigator || {};
+            const ua = String(nav.userAgent || '');
+            const isiOS = /iPad|iPhone|iPod/i.test(ua)
+                || (nav.platform === 'MacIntel' && Number(nav.maxTouchPoints || 0) > 1);
+            const isSmallTouchScreen = window.matchMedia('(pointer: coarse)').matches
+                && window.matchMedia('(max-width: 820px)').matches;
+            const destination = new URL(
+                isiOS || isSmallTouchScreen ? '/NexPlay.mobile.html' : '/index.html',
+                window.location.origin
+            );
+            destination.search = window.location.search;
+            destination.hash = window.location.hash;
+            window.location.replace(destination.href);
+        })();
+    </script>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: #050505;
+            color: #e2e8f0;
+            font-family: system-ui, sans-serif;
+        }
+        main {
+            padding: 1.5rem;
+            text-align: center;
+        }
+        a {
+            color: #67e8f9;
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <p>Opening NexPlay...</p>
+        <p>
+            <a href="/index.html">Open desktop</a>
+            <span aria-hidden="true"> &middot; </span>
+            <a href="/NexPlay.mobile.html">Open mobile web</a>
+        </p>
+        <noscript>
+            <p>JavaScript is required for automatic device routing. Choose a version above.</p>
+        </noscript>
+    </main>
+</body>
+</html>

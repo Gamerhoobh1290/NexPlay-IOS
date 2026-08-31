@@ -1,0 +1,278 @@
+/* NexPlay animation keyframes and reduced-motion guards. */
+
+
+body.reduce-motion *,
+body.reduce-motion *::before,
+body.reduce-motion *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+}
+
+
+	        @keyframes fsModeLyricFadeIn { from { opacity: 0; } to { opacity: 0.95; } }
+
+
+	        /* Keyframes */
+	        @keyframes auroraShift {
+	            0% { transform: rotate(-2deg) scale(1); }
+	            100% { transform: rotate(6deg) scale(1.08); }
+	        }
+
+
+	        @keyframes haloPulse {
+	            0%, 100% { transform: scale(1); opacity: 0.82; }
+	            50% { transform: scale(1.06); opacity: 1; }
+	        }
+
+
+	        @keyframes glimmer {
+	            from { transform: rotate(0deg); }
+	            to { transform: rotate(360deg); }
+	        }
+
+
+	        @keyframes drift {
+	            from { transform: translateX(-40%); }
+	            to { transform: translateX(120%); }
+	        }
+
+
+    @keyframes musicSnakeSlideStep {
+        0% {
+            transform: translate3d(calc(var(--snake-shift-x, 0%) + var(--snake-gap-x, 0rem)), calc(var(--snake-shift-y, 0%) + var(--snake-gap-y, 0rem)), 0) scale(0.985);
+        }
+        100% {
+            transform: translate3d(0, 0, 0) scale(1);
+        }
+    }
+
+
+    @keyframes musicRaceStripeRise {
+        from { transform: translateY(0); }
+        to { transform: translateY(-36px); }
+    }
+
+
+    @keyframes musicRaceEqualizer {
+        0%, 100% { height: 0.24rem; opacity: 0.55; }
+        35% { height: 0.7rem; opacity: 0.95; }
+        70% { height: 0.42rem; opacity: 0.7; }
+    }
+
+
+    @keyframes musicRacePulse {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-1px) scale(1.04); }
+    }
+
+
+@keyframes pianoFeedbackPop {
+    0% { opacity: 0; transform: translate(-50%, -42%) scale(0.82); }
+    18% { opacity: 1; transform: translate(-50%, -50%) scale(1.04); }
+    100% { opacity: 0; transform: translate(-50%, -74%) scale(0.94); }
+}
+
+
+@keyframes pianoParticleBurst {
+    from {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translate3d(var(--particle-x, 0), var(--particle-y, -42px), 0) scale(0.18);
+    }
+}
+
+
+@keyframes pianoAnalysisSpin {
+    to { transform: rotate(360deg); }
+}
+
+
+/* High End-only tab entrances. Adaptive throttling and Reduced Motion always win. */
+body.performance-preset-high-end:not(.reduce-motion):not(.creative-throttle-degraded):not(.creative-throttle-low) .nexplay-high-end-tab-enter,
+body.performance-preset-high-end:not(.reduce-motion):not(.creative-throttle-degraded):not(.creative-throttle-low) .nexplay-high-end-tab-enter-prep {
+    transform-origin: center top;
+    will-change: transform, opacity;
+}
+
+body.performance-preset-high-end:not(.reduce-motion):not(.creative-throttle-degraded):not(.creative-throttle-low) .nexplay-high-end-tab-enter-prep {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.99);
+}
+
+body.performance-preset-high-end:not(.reduce-motion):not(.creative-throttle-degraded):not(.creative-throttle-low) .nexplay-high-end-tab-enter {
+    animation: nexplayHighEndTabStageIn 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+body.performance-preset-high-end:not(.reduce-motion):not(.creative-throttle-degraded):not(.creative-throttle-low) .nexplay-high-end-tab-pop,
+body.performance-preset-high-end:not(.reduce-motion):not(.creative-throttle-degraded):not(.creative-throttle-low) .nexplay-high-end-tab-pop-prep {
+    transform-origin: center top;
+    will-change: transform, opacity;
+}
+
+body.performance-preset-high-end:not(.reduce-motion):not(.creative-throttle-degraded):not(.creative-throttle-low) .nexplay-high-end-tab-pop-prep {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0) scale(0.965);
+}
+
+body.performance-preset-high-end:not(.reduce-motion):not(.creative-throttle-degraded):not(.creative-throttle-low) .nexplay-high-end-tab-pop {
+    animation: nexplayHighEndTabPanelPop 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(62ms + (var(--nexplay-tab-pop-index, 0) * 34ms));
+}
+
+body.performance-preset-high-end:not(.reduce-motion):not(.creative-throttle-degraded):not(.creative-throttle-low) .nexplay-high-end-tab-nav-pop,
+body.performance-preset-high-end:not(.reduce-motion):not(.creative-throttle-degraded):not(.creative-throttle-low) .nexplay-high-end-tab-nav-pop-prep {
+    transform-origin: center;
+}
+
+body.performance-preset-high-end:not(.reduce-motion):not(.creative-throttle-degraded):not(.creative-throttle-low) .nexplay-high-end-tab-nav-pop-prep {
+    opacity: 0.7;
+    transform: scale(0.94);
+}
+
+body.performance-preset-high-end:not(.reduce-motion):not(.creative-throttle-degraded):not(.creative-throttle-low) .nexplay-high-end-tab-nav-pop {
+    animation: nexplayHighEndTabNavPop 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes nexplayHighEndTabStageIn {
+    0% { opacity: 0; transform: translate3d(0, 14px, 0) scale(0.99); }
+    68% { opacity: 1; transform: translate3d(0, -2px, 0) scale(1.004); }
+    100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes nexplayHighEndTabPanelPop {
+    0% { opacity: 0; transform: translate3d(0, 12px, 0) scale(0.965); }
+    72% { opacity: 1; transform: translate3d(0, -1px, 0) scale(1.012); }
+    100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes nexplayHighEndTabNavPop {
+    0% { opacity: 0.7; transform: scale(0.94); }
+    68% { opacity: 1; transform: scale(1.035); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+
+/* Album loading stays static on Low End; motion is enabled only by the High End gate. */
+.online-music-release-skeleton {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.online-music-release-skeleton-row {
+    display: grid;
+    grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 0.75rem;
+    overflow: hidden;
+    border: 1px solid rgb(255 255 255 / 0.08);
+    border-radius: 1rem;
+    background: rgb(0 0 0 / 0.3);
+    opacity: 0.72;
+}
+
+.online-music-release-skeleton-art,
+.online-music-release-skeleton-copy > span,
+.online-music-release-skeleton-time {
+    display: block;
+    border-radius: 0.75rem;
+    background: rgb(255 255 255 / 0.09);
+}
+
+.online-music-release-skeleton-art {
+    aspect-ratio: 1;
+}
+
+.online-music-release-skeleton-copy {
+    display: grid;
+    gap: 0.55rem;
+}
+
+.online-music-release-skeleton-copy > span {
+    padding-block: 0.34rem;
+    max-inline-size: 24rem;
+}
+
+.online-music-release-skeleton-copy > span:last-child {
+    max-inline-size: 14rem;
+    opacity: 0.65;
+}
+
+.online-music-release-skeleton-time {
+    inline-size: 2.75rem;
+    padding-block: 0.32rem;
+}
+
+body.performance-preset-high-end:not(.reduce-motion):not(.creative-throttle-degraded):not(.creative-throttle-low) .online-music-release-skeleton .online-music-release-skeleton-row {
+    animation: nexplayReleaseSkeletonBreathe 1.15s ease-in-out infinite;
+    animation-delay: calc(var(--nexplay-release-skeleton-index, 0) * 70ms);
+}
+
+body.performance-preset-high-end:not(.reduce-motion):not(.creative-throttle-degraded):not(.creative-throttle-low) .online-music-release-tracks-enter > [data-online-music-track-row] {
+    animation: nexplayReleaseTrackEnter 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--nexplay-release-track-index, 0) * 26ms);
+}
+
+body.performance-preset-high-end:not(.reduce-motion):not(.creative-throttle-degraded):not(.creative-throttle-low) .online-music-live-search-results-enter > [data-online-music-track-row] {
+    animation: nexplayLiveSearchResultEnter 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--nexplay-live-search-index, 0) * 18ms);
+}
+
+.online-music-release-tracks-enter > [data-online-music-track-row]:nth-child(2) { --nexplay-release-track-index: 1; }
+.online-music-release-tracks-enter > [data-online-music-track-row]:nth-child(3) { --nexplay-release-track-index: 2; }
+.online-music-release-tracks-enter > [data-online-music-track-row]:nth-child(4) { --nexplay-release-track-index: 3; }
+.online-music-release-tracks-enter > [data-online-music-track-row]:nth-child(5) { --nexplay-release-track-index: 4; }
+.online-music-release-tracks-enter > [data-online-music-track-row]:nth-child(6) { --nexplay-release-track-index: 5; }
+.online-music-release-tracks-enter > [data-online-music-track-row]:nth-child(7) { --nexplay-release-track-index: 6; }
+.online-music-release-tracks-enter > [data-online-music-track-row]:nth-child(8) { --nexplay-release-track-index: 7; }
+.online-music-release-tracks-enter > [data-online-music-track-row]:nth-child(n + 9) { --nexplay-release-track-index: 8; }
+
+.online-music-live-search-results-enter > [data-online-music-track-row]:nth-child(2) { --nexplay-live-search-index: 1; }
+.online-music-live-search-results-enter > [data-online-music-track-row]:nth-child(3) { --nexplay-live-search-index: 2; }
+.online-music-live-search-results-enter > [data-online-music-track-row]:nth-child(4) { --nexplay-live-search-index: 3; }
+.online-music-live-search-results-enter > [data-online-music-track-row]:nth-child(5) { --nexplay-live-search-index: 4; }
+.online-music-live-search-results-enter > [data-online-music-track-row]:nth-child(6) { --nexplay-live-search-index: 5; }
+.online-music-live-search-results-enter > [data-online-music-track-row]:nth-child(7) { --nexplay-live-search-index: 6; }
+.online-music-live-search-results-enter > [data-online-music-track-row]:nth-child(8) { --nexplay-live-search-index: 7; }
+.online-music-live-search-results-enter > [data-online-music-track-row]:nth-child(n + 9) { --nexplay-live-search-index: 8; }
+
+@keyframes nexplayReleaseSkeletonBreathe {
+    0%, 100% { opacity: 0.58; transform: translate3d(0, 0, 0); }
+    50% { opacity: 0.9; transform: translate3d(3px, 0, 0); }
+}
+
+@keyframes nexplayReleaseTrackEnter {
+    from { opacity: 0; transform: translate3d(0, 9px, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes nexplayLiveSearchResultEnter {
+    from { opacity: 0; transform: translate3d(0, 7px, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+
+
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    .online-music-release-skeleton .online-music-release-skeleton-row,
+    .online-music-release-tracks-enter > [data-online-music-track-row],
+    .online-music-live-search-results-enter > [data-online-music-track-row] {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+    }
+
+    * {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+}

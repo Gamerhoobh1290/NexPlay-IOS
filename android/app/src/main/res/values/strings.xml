@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NexPlay</string>
+    <string name="retry">Retry</string>
+    <string name="loading_start">Starting NexPlay...</string>
+    <string name="loading_retry">Retrying NexPlay localhost server...</string>
+    <string name="loading_page">Loading NexPlay...</string>
+    <string name="file_chooser_title">Choose a file</string>
+    <string name="error_page_title">NexPlay Couldn\'t Load</string>
+    <string name="error_page_message">The embedded localhost page failed to load. Retry to restart the local server.</string>
+    <string name="media_channel_name">Playback</string>
+    <string name="media_channel_description">NexPlay playback controls and progress</string>
+    <string name="media_action_play">Play</string>
+    <string name="media_action_pause">Pause</string>
+    <string name="media_action_previous">Previous</string>
+    <string name="media_action_next">Next</string>
+</resources>

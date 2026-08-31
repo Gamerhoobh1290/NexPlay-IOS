@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexPlay</title>
+    <meta http-equiv="refresh" content="0; url=/NexPlay.html">
+    <link rel="icon" href="/assets/NexPlay_N_final_256.ico" type="image/x-icon">
+    <script>
+        (() => {
+            const destination = new URL('/NexPlay.html', window.location.origin);
+            destination.search = window.location.search;
+            destination.hash = window.location.hash;
+            window.location.replace(destination.href);
+        })();
+    </script>
+</head>
+<body>
+    <p><a href="/NexPlay.html">Open NexPlay</a></p>
+</body>
+</html>

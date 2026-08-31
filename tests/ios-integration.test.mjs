@@ -1,0 +1,134 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import test from 'node:test';
+
+/** @param {string} relativePath */
+const read = (relativePath) => fs.readFileSync(new URL(`../${relativePath}`, import.meta.url), 'utf8');
+
+const mobile = read('NexPlay.mobile.html');
+const app = read('ios/NexPlay/NexPlay/NexPlayApp.swift');
+const contentView = read('ios/NexPlay/NexPlay/ContentView.swift');
+const webView = read('ios/NexPlay/NexPlay/NexPlayWebView.swift');
+const playbackBridge = read('ios/NexPlay/NexPlay/NexPlayPlaybackBridge.swift');
+const bridgeScripts = read('ios/NexPlay/NexPlay/NexPlayIOSBridgeScripts.swift');
+const infoPlist = read('ios/NexPlay/NexPlay/Info.plist');
+const project = read('ios/NexPlay/NexPlay.xcodeproj/project.pbxproj');
+
+const iphoneSiteBuild = read('scripts/build-iphone-site.cjs');
+
+test('every top-level directory the shells reference is staged by the iPhone site build', () => {
+    // The build validates that sources exist, not that references resolve, so a
+    // shell can silently ship with a dangling ./vendor or ./css reference.
+    const referenced = new Set();
+    for (const html of [mobile, read('index.html')]) {
+        for (const match of html.matchAll(/(?:src|href)="\.\/([^/"]+)\//g)) {
+            referenced.add(match[1]);
+        }
+    }
+    assert.ok(referenced.has('vendor'), 'shells should reference the vendored libraries');
+    for (const directory of referenced) {
+        assert.ok(
+            iphoneSiteBuild.includes(`'${directory}'`),
+            `build-iphone-site.cjs must stage ./${directory}/`
+        );
+    }
+});
+
+test('iOS build bundles every local dependency used by the mobile shell', () => {
+    for (const path of ['css', 'js', 'components', 'assets', 'vendor', 'nexplay-next']) {
+        assert.match(project, new RegExp(`\\$\\(SRCROOT\\)/\\.\\./\\.\\./${path}`));
+        assert.match(project, new RegExp(`for item in [^;]*\\b${path}\\b`));
+    }
+    assert.match(project, /NexPlay\.mobile\.html/);
+});
+
+test('iPhone shell loads fonts, icons, and charts from the bundle rather than a CDN', () => {
+    assert.doesNotMatch(mobile, /fonts\.googleapis\.com|fonts\.gstatic\.com|unpkg\.com|cdn\.jsdelivr\.net/);
+    assert.match(mobile, /\.\/vendor\/lucide\/lucide\.min\.js/);
+    assert.match(mobile, /\.\/vendor\/chart\/chart\.umd\.min\.js/);
+    assert.match(mobile, /\.\/vendor\/fonts\/outfit\/300\.css/);
+    assert.match(mobile, /\.\/vendor\/fonts\/space-mono\/700\.css/);
+});
+
+test('iPhone shell exposes safe areas, system appearance, and native runtime identity', () => {
+    assert.match(mobile, /viewport-fit=cover/);
+    assert.match(mobile, /env\(safe-area-inset-top\)/);
+    assert.match(mobile, /env\(safe-area-inset-bottom\)/);
+    assert.match(mobile, /function isIOSNativeRuntime\(\)/);
+    assert.match(mobile, /isIOSNativeRuntime\(\) \? 'iPhone App' : 'Web Build'/);
+    assert.doesNotMatch(app, /preferredColorScheme\(\.dark\)/);
+    assert.match(contentView, /Color\(uiColor: \.systemBackground\)/);
+});
+
+test('no provider API key is baked into a publicly served source file', () => {
+    // The web build serves js/ verbatim, so a committed key is world-readable
+    // the moment the site deploys. Keys belong in Settings > Online Music.
+    const googleApiKey = /AIza[0-9A-Za-z_-]{30,}/;
+    for (const source of ['js/legacy/runtime-config.js', 'NexPlay.mobile.html', 'index.html']) {
+        assert.doesNotMatch(read(source), googleApiKey, `${source} must not contain an API key`);
+    }
+    assert.match(read('js/legacy/runtime-config.js'), /const YOUTUBE_DATA_API_KEY = '';/);
+});
+
+test('iPhone shell suppresses the WKWebView touch tells', () => {
+    assert.match(mobile, /-webkit-text-size-adjust:\s*100%/);
+    assert.match(mobile, /-webkit-tap-highlight-color:\s*transparent/);
+    assert.match(mobile, /touch-action:\s*manipulation/);
+    assert.match(mobile, /-webkit-touch-callout:\s*none/);
+    assert.match(mobile, /overscroll-behavior:\s*contain/);
+    // Text the user may want to copy must stay selectable.
+    assert.match(mobile, /\[contenteditable="true"\][\s\S]{0,120}user-select:\s*text/);
+});
+
+test('transport controls meet the 44pt touch target minimum on touch devices', () => {
+    const coarse = mobile.match(/@media \(pointer: coarse\) \{[\s\S]*?\n        \}/);
+    assert.ok(coarse, 'expected a pointer:coarse block sizing the transport controls');
+    for (const id of ['#mini-play-toggle', '#mini-prev-btn', '#mini-next-btn', '#shuffle-btn', '#repeat-btn']) {
+        assert.ok(coarse[0].includes(id), `${id} should get a 44pt touch target`);
+    }
+    assert.match(coarse[0], /min-width:\s*44px/);
+    assert.match(coarse[0], /min-height:\s*44px/);
+});
+
+test('iOS Online Music uses device configuration and shared Desktop relevance logic', () => {
+    assert.match(mobile, /const YOUTUBE_DATA_API_KEY = '';/);
+    assert.match(mobile, /type="password"[^>]+aria-label="YouTube Data API key"[^>]+setOnlineMusicCustomApiKey/);
+    assert.match(mobile, /scoreOnlineMusicSearchResultForQuery/);
+    assert.match(mobile, /classifyOnlineMusicSearchResultEligibility/);
+    assert.match(mobile, /mergeOnlineMusicSearchResults\(orderedResults, query\)/);
+    assert.match(mobile, /navigator\.onLine === false/);
+    assert.match(mobile, /addEventListener\('offline', handleOnlineMusicConnectivityChange\)/);
+    assert.match(mobile, /addEventListener\('online', handleOnlineMusicConnectivityChange\)/);
+
+    const configuredKeyStart = mobile.indexOf('function getConfiguredOnlineMusicApiKey');
+    const configuredKeyEnd = mobile.indexOf('function syncConfiguredOnlineMusicApiKey', configuredKeyStart);
+    const configuredKeySource = mobile.slice(configuredKeyStart, configuredKeyEnd);
+    assert.doesNotMatch(configuredKeySource, /getOnlineMusicState\(\)\.apiKey/);
+});
+
+test('native playback bridge covers background audio lifecycle and lock-screen metadata', () => {
+    assert.match(infoPlist, /<string>audio<\/string>/);
+    assert.match(playbackBridge, /setCategory\(\.playback/);
+    assert.match(playbackBridge, /configureAudioSession\(activate: false\)/);
+    assert.match(playbackBridge, /AVAudioSession\.interruptionNotification/);
+    assert.match(playbackBridge, /AVAudioSession\.routeChangeNotification/);
+    assert.match(playbackBridge, /\.oldDeviceUnavailable/);
+    assert.match(playbackBridge, /MPNowPlayingInfoCenter/);
+    assert.match(playbackBridge, /MPMediaItemArtwork/);
+    assert.match(playbackBridge, /MPRemoteCommandCenter/);
+    assert.match(playbackBridge, /changePlaybackPositionCommand/);
+    assert.match(playbackBridge, /data\.count <= 10_000_000/);
+
+    for (const command of ['play', 'pause', 'toggle', 'next', 'previous', 'seekToMs']) {
+        assert.match(bridgeScripts, new RegExp(`${command}: function`));
+    }
+    assert.match(bridgeScripts, /artworkUrl:/);
+});
+
+test('WKWebView keeps app navigation local and opens target-blank links externally', () => {
+    assert.match(webView, /navigationAction\.targetFrame == nil/);
+    assert.match(webView, /UIApplication\.shared\.open\(url\)/);
+    assert.match(webView, /Self\.isLocalAppURL\(url\)/);
+    assert.match(webView, /allowsInlineMediaPlayback = true/);
+    assert.match(webView, /mediaTypesRequiringUserActionForPlayback = \[\]/);
+});

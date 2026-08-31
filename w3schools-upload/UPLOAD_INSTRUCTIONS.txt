@@ -1,0 +1,1 @@
+Upload everything inside this folder to your W3Schools Space. index.html is already included as the homepage.

@@ -1,0 +1,401 @@
+/* NexPlay themes: light mode, private mode, density, scene packs, and performance appearance states. */
+
+
+body.theme-light {
+    --bg-deep: #eef3f8;
+    color: #0f172a;
+}
+
+
+body.theme-light::before {
+    opacity: calc(0.03 + (var(--beat-intensity) * 0.14) + (var(--mood-intensity) * 0.05));
+}
+
+
+body.theme-light .mesh-bg {
+    filter: blur(92px);
+    opacity: 0.72;
+}
+
+
+body.theme-light .grid-overlay {
+    background-image:
+        linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+}
+
+
+body.theme-light .holo-panel {
+    background: rgba(255, 255, 255, 0.82);
+    border-color: rgba(15, 23, 42, 0.08);
+    box-shadow:
+        0 20px 40px rgba(148, 163, 184, 0.18),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+
+
+body.theme-light .holo-card {
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.9) 0%, rgba(226, 232, 240, 0.82) 100%);
+    border-color: rgba(15, 23, 42, 0.08);
+    box-shadow: 0 18px 36px rgba(148, 163, 184, 0.16);
+}
+
+
+body.theme-light .track-active {
+    background: rgba(var(--accent-rgb, 6, 182, 212), 0.12) !important;
+    border-left-color: var(--accent-color) !important;
+    box-shadow: 0 12px 24px rgba(var(--accent-rgb, 6, 182, 212), 0.15);
+}
+
+
+body.theme-light .track-selected {
+    background: rgba(14, 165, 233, 0.08) !important;
+}
+
+
+body.theme-light :is(.text-white, .text-gray-200) {
+    color: #0f172a !important;
+}
+
+
+body.theme-light .text-gray-300 {
+    color: #1e293b !important;
+}
+
+
+body.theme-light .text-gray-400 {
+    color: #334155 !important;
+}
+
+
+body.theme-light .text-gray-500 {
+    color: #64748b !important;
+}
+
+
+body.theme-light .text-gray-600,
+body.theme-light .text-gray-700 {
+    color: #94a3b8 !important;
+}
+
+
+body.theme-light #sidebar,
+body.theme-light #queue-overlay,
+body.theme-light #command-palette-modal > div,
+body.theme-light #video-url-hub,
+body.theme-light [data-view="list"],
+body.theme-light #tracks-container > div[class*="bg-[#1a1d26]"],
+body.theme-light #tracks-container > div[class*="bg-black/30"],
+body.theme-light #tracks-container > div[class*="bg-black/40"] {
+    background: rgba(255, 255, 255, 0.78) !important;
+    border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+
+body.theme-light #windowedModePanel,
+body.theme-light #fsModeOverlay,
+body.theme-light #videoFsModeOverlay {
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(226, 232, 240, 0.98)) !important;
+}
+
+
+body.theme-light input,
+body.theme-light select,
+body.theme-light textarea,
+body.theme-light button {
+    color-scheme: light;
+}
+
+
+body.private-route-active {
+    --accent-color: #fb7185;
+    --accent-glow: rgba(251, 113, 133, 0.34);
+    background:
+        linear-gradient(180deg, #050506 0%, #11100e 48%, #060607 100%) !important;
+}
+
+
+body.private-route-active::before {
+    background:
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 9px),
+        repeating-linear-gradient(0deg, rgba(251, 113, 133, 0.045) 0 1px, transparent 1px 24px),
+        linear-gradient(135deg, rgba(251, 146, 60, 0.12), transparent 36%, rgba(244, 63, 94, 0.09));
+    opacity: calc(0.18 + (var(--beat-intensity) * 0.14));
+}
+
+
+.private-route-shell {
+    border: 1px solid rgba(255, 241, 242, 0.12);
+    background:
+        linear-gradient(180deg, rgba(10, 10, 11, 0.96), rgba(16, 15, 14, 0.98)),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 36px);
+    box-shadow:
+        0 34px 88px rgba(0, 0, 0, 0.52),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+
+.private-route-hero {
+    border: 1px solid rgba(251, 113, 133, 0.22);
+    background:
+        linear-gradient(135deg, rgba(251, 113, 133, 0.15), rgba(251, 146, 60, 0.08) 42%, rgba(10, 10, 11, 0.74)),
+        rgba(10, 10, 11, 0.86);
+}
+
+
+.private-route-panel {
+    border: 1px solid rgba(255, 241, 242, 0.1);
+    background: rgba(12, 12, 13, 0.78);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+
+.private-route-input {
+    color: #fff7ed !important;
+    caret-color: #fb7185;
+    color-scheme: dark;
+    background: rgba(8, 8, 9, 0.9) !important;
+    border-color: rgba(251, 113, 133, 0.24) !important;
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.035),
+        0 10px 26px rgba(0, 0, 0, 0.24);
+}
+
+
+.private-route-input::placeholder {
+    color: rgba(148, 163, 184, 0.72) !important;
+}
+
+
+body.theme-light .private-route-input {
+    color: #fff7ed !important;
+    background: rgba(8, 8, 9, 0.92) !important;
+}
+
+
+.private-route-pill {
+    border: 1px solid rgba(251, 113, 133, 0.32);
+    background: rgba(251, 113, 133, 0.12);
+    color: #ffe4e6;
+}
+
+
+.private-route-indicator {
+    border: 1px solid rgba(251, 113, 133, 0.32);
+    background:
+        linear-gradient(135deg, rgba(136, 19, 55, 0.94), rgba(124, 45, 18, 0.94));
+    box-shadow:
+        0 16px 32px rgba(136, 19, 55, 0.24),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+
+.private-route-active .track-active {
+    box-shadow: 0 0 0 1px rgba(251, 113, 133, 0.38);
+}
+
+
+#private-session-page [class*="border-teal"] {
+    border-color: rgba(251, 113, 133, 0.18) !important;
+}
+
+
+#private-session-page [class*="bg-teal"] {
+    background-color: rgba(251, 113, 133, 0.14) !important;
+}
+
+
+#private-session-page [class*="text-teal"] {
+    color: #ffe4e6 !important;
+}
+
+
+#private-session-page [class*="bg-slate"] {
+    background-color: rgba(9, 9, 10, 0.62) !important;
+}
+
+
+#private-session-page [class*="text-slate"] {
+    color: #d6d3d1 !important;
+}
+
+
+#private-session-page [class*="ring-teal"] {
+    --tw-ring-color: rgba(251, 113, 133, 0.42) !important;
+}
+
+
+#private-session-page .rounded-2xl,
+#private-session-page .rounded-xl,
+#private-session-page .rounded-\[1\.6rem\],
+#private-session-page .rounded-\[1\.7rem\] {
+    border-radius: 0.5rem !important;
+}
+
+
+body.scene-pack-aurora .mesh-bg {
+    background:
+        radial-gradient(circle at 15% 45%, rgba(70, 180, 255, 0.24), transparent 30%),
+        radial-gradient(circle at 75% 30%, rgba(150, 90, 255, 0.2), transparent 30%);
+    animation-duration: 14s;
+}
+
+
+body.scene-pack-ember .mesh-bg {
+    background:
+        radial-gradient(circle at 15% 45%, rgba(251, 146, 60, 0.23), transparent 32%),
+        radial-gradient(circle at 75% 65%, rgba(239, 68, 68, 0.2), transparent 30%);
+    animation-duration: 18s;
+}
+
+
+body.scene-pack-midnight .mesh-bg {
+    background:
+        radial-gradient(circle at 20% 55%, rgba(59, 130, 246, 0.2), transparent 33%),
+        radial-gradient(circle at 75% 35%, rgba(14, 165, 233, 0.16), transparent 30%);
+    animation-duration: 20s;
+}
+
+
+body.scene-pack-nebula .mesh-bg {
+    background:
+        radial-gradient(circle at 18% 42%, rgba(168, 85, 247, 0.24), transparent 30%),
+        radial-gradient(circle at 78% 34%, rgba(236, 72, 153, 0.18), transparent 32%);
+    animation-duration: 17s;
+}
+
+
+body.scene-pack-voltage .mesh-bg {
+    background:
+        radial-gradient(circle at 16% 48%, rgba(34, 211, 238, 0.25), transparent 29%),
+        radial-gradient(circle at 78% 28%, rgba(163, 230, 53, 0.18), transparent 28%);
+    animation-duration: 11s;
+}
+
+
+body.scene-pack-prism .mesh-bg {
+    background:
+        radial-gradient(circle at 14% 38%, rgba(244, 114, 182, 0.22), transparent 30%),
+        radial-gradient(circle at 78% 62%, rgba(34, 211, 238, 0.18), transparent 30%);
+    animation-duration: 15s;
+}
+
+
+body.scene-pack-circuit .mesh-bg {
+    background:
+        radial-gradient(circle at 18% 52%, rgba(16, 185, 129, 0.2), transparent 30%),
+        radial-gradient(circle at 80% 30%, rgba(59, 130, 246, 0.18), transparent 29%);
+    animation-duration: 13s;
+}
+
+
+body.creative-throttle-degraded::before {
+    transition-duration: 260ms;
+}
+
+
+body.creative-throttle-degraded .mesh-bg {
+    filter: blur(56px);
+    animation-duration: 18s !important;
+    opacity: 0.82;
+}
+
+
+body.creative-throttle-degraded #windowedModeBgArt {
+    filter: blur(72px) !important;
+    animation: none !important;
+    opacity: 0.22 !important;
+}
+
+
+body.creative-throttle-degraded #windowedModeAccentAmbient {
+    opacity: 0.12 !important;
+    mix-blend-mode: normal;
+}
+
+
+body.creative-throttle-degraded #windowedModeControlsOverlay {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(0, 0, 0, 0.48);
+}
+
+
+body.creative-throttle-low::before {
+    opacity: calc(0.04 + (var(--mood-intensity) * 0.05));
+    transition: none;
+}
+
+
+body.creative-throttle-low .holo-card {
+    transition-duration: 160ms;
+}
+
+
+body.creative-throttle-low .mesh-bg {
+    filter: blur(36px);
+    opacity: 0.46;
+    animation: none !important;
+}
+
+
+body.creative-throttle-low #windowedModeBgArt {
+    display: none !important;
+}
+
+
+body.creative-throttle-low #windowedModeAccentAmbient {
+    opacity: 0.08 !important;
+}
+
+
+body.performance-preset-low-end .holo-panel {
+    background: rgba(10, 14, 20, 0.96);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    transition-duration: 160ms;
+}
+
+
+body.theme-light.performance-preset-low-end .holo-panel {
+    background: rgba(255, 255, 255, 0.97);
+}
+
+
+body.performance-preset-low-end .holo-card::before {
+    display: none;
+}
+
+
+body.performance-preset-low-end .holo-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px -10px var(--accent-glow);
+}
+
+
+body.performance-preset-low-end .performance-preset-settings-choice,
+body.performance-preset-low-end .performance-preset-choice,
+body.performance-preset-low-end .performance-preset-choice-arrow {
+    transition-duration: 120ms;
+}
+
+
+body.performance-preset-low-end .performance-preset-settings-choice:hover,
+body.performance-preset-low-end .performance-preset-settings-choice:focus-visible {
+    transform: none;
+}
+
+
+body.theme-light .setting-help-trigger {
+    background: rgba(15, 23, 42, 0.06);
+    border-color: rgba(15, 23, 42, 0.14);
+    color: #0f172a;
+}
+
+
+body.theme-light .setting-help-tooltip {
+    background: rgba(15, 23, 42, 0.96);
+    border-color: rgba(148, 163, 184, 0.32);
+    color: #e2e8f0;
+}

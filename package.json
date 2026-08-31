@@ -1,0 +1,81 @@
+{
+  "name": "nexplay-next",
+  "version": "2.2.1",
+  "description": "NexPlay desktop application",
+  "author": "NexPlay",
+  "private": true,
+  "type": "module",
+  "main": "electron-main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis portable",
+    "dist:installer": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$ErrorActionPreference = 'Stop'; $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'; $stagingOut = '.\\dist-installer-build-' + $stamp; npx electron-builder --win nsis --config.directories.output=$stagingOut; if ($LASTEXITCODE -ne 0) { throw ('electron-builder failed with exit code ' + $LASTEXITCODE + '.') }; New-Item -ItemType Directory -Path '.\\dist-installer' -Force | Out-Null; $setup = Get-ChildItem -LiteralPath $stagingOut -Filter 'NexPlay Setup *.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if (-not $setup) { throw 'NexPlay setup artifact was not found in staging output.' }; Copy-Item -LiteralPath $setup.FullName -Destination (Join-Path '.\\dist-installer' $setup.Name) -Force; $blockMapPath = $setup.FullName + '.blockmap'; if (Test-Path -LiteralPath $blockMapPath) { Copy-Item -LiteralPath $blockMapPath -Destination (Join-Path '.\\dist-installer' ([IO.Path]::GetFileName($blockMapPath))) -Force }; $builderDebug = Join-Path $stagingOut 'builder-debug.yml'; if (Test-Path -LiteralPath $builderDebug) { Copy-Item -LiteralPath $builderDebug -Destination '.\\dist-installer\\builder-debug.yml' -Force }\"",
+    "make:uninstaller": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"New-Item -ItemType Directory -Path 'dist' -Force | Out-Null; dotnet publish '.\\tools\\NexPlayUninstallerExe\\NexPlayUninstallerExe.csproj' -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false -o '.\\dist\\uninstaller-exe'; Copy-Item -LiteralPath '.\\dist\\uninstaller-exe\\NexPlayUninstaller.exe' -Destination '.\\dist\\NexPlay Uninstaller.exe' -Force\"",
+    "make:updater": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$ErrorActionPreference = 'Stop'; $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'; $stagingOut = '.\\dist-updater-build-' + $stamp; $payloadOut = '.\\dist-updater-payload\\win-unpacked'; New-Item -ItemType Directory -Path '.\\dist' -Force | Out-Null; & '.\\node_modules\\.bin\\electron-builder.cmd' --win --dir --config.directories.output=$stagingOut; if ($LASTEXITCODE -ne 0) { throw ('electron-builder failed with exit code ' + $LASTEXITCODE + '.') }; New-Item -ItemType Directory -Path $payloadOut -Force | Out-Null; robocopy (Join-Path $stagingOut 'win-unpacked') $payloadOut /MIR /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null; if ($LASTEXITCODE -ge 8) { throw ('robocopy failed with exit code ' + $LASTEXITCODE + '.') }; $env:APPDATA = (Join-Path (Resolve-Path '.').ProviderPath '.build-appdata'); New-Item -ItemType Directory -Path $env:APPDATA -Force | Out-Null; $userNuGetPackages = Join-Path $env:USERPROFILE '.nuget\\packages'; if (Test-Path -LiteralPath $userNuGetPackages) { $env:NUGET_PACKAGES = $userNuGetPackages }; dotnet restore '.\\tools\\NexPlayUpdaterExe\\NexPlayUpdaterExe.csproj' -r win-x64 --configfile '.\\NuGet.Config' --ignore-failed-sources; if ($LASTEXITCODE -ne 0) { throw ('dotnet restore failed with exit code ' + $LASTEXITCODE + '.') }; dotnet publish '.\\tools\\NexPlayUpdaterExe\\NexPlayUpdaterExe.csproj' -c Release -r win-x64 --self-contained true --no-restore -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false -o '.\\dist\\updater-exe'; if ($LASTEXITCODE -ne 0) { throw ('dotnet publish failed with exit code ' + $LASTEXITCODE + '.') }; Copy-Item -LiteralPath '.\\dist\\updater-exe\\NexPlayUpdater.exe' -Destination '.\\dist\\NexPlay Updater.exe' -Force\"",
+    "make:update-release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\Create-NexPlayUpdatePackage.ps1",
+    "make:update-bundle": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\Create-NexPlayWindowsUpdaterBundle.ps1",
+    "make:uninstaller-script": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"New-Item -ItemType Directory -Path 'dist\\scripts' -Force | Out-Null; Copy-Item -LiteralPath 'NexPlay-Uninstall.cmd' -Destination 'dist\\NexPlay Uninstaller.cmd' -Force; Copy-Item -LiteralPath 'scripts\\uninstall-nexplay.ps1' -Destination 'dist\\scripts\\uninstall-nexplay.ps1' -Force\"",
+    "uninstall:nexplay": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\uninstall-nexplay.ps1",
+    "build:web-site": "node scripts/build-web-site.cjs",
+    "build:iphone-site": "node scripts/build-iphone-site.cjs",
+    "verify:web-site": "node scripts/verify-web-build.cjs",
+    "test:web-publish": "node --test tests/web-publish.test.mjs",
+    "serve:iphone": "node scripts/serve-iphone-nexplay.cjs",
+    "build:tailwind": "tailwindcss -c tailwind.config.cjs -i ./tailwind.input.css -o ./css/tailwind.generated.css --minify",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test": "node tests/run-tests.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "electron": "43.1.1",
+    "electron-builder": "26.15.3",
+    "postcss": "8.5.10",
+    "tailwindcss": "3.4.17",
+    "typescript": "5.9.3"
+  },
+  "build": {
+    "appId": "com.nexplay.app",
+    "productName": "NexPlay",
+    "buildVersion": "2.2.1.0",
+    "files": [
+      "index.html",
+      "NexPlay.html",
+      "NexPlay.mobile.html",
+      "css/**/*",
+      "js/**/*",
+      "components/**/*",
+      "assets/**/*",
+      "vendor/**/*",
+      "MODULAR_ARCHITECTURE.md",
+      "nexplay-next/**/*",
+      "manifest.webmanifest",
+      "manifest.iphone.webmanifest",
+      "sw.js",
+      "electron-main.cjs",
+      "NexPlay_N_final_256.ico",
+      "nexplay-icon-brand.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "NexPlay_N_final_256.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NexPlay",
+      "artifactName": "NexPlay Setup ${version}.${ext}"
+    }
+  },
+  "dependencies": {
+    "@fontsource/outfit": "5.3.0",
+    "@fontsource/space-mono": "5.3.0",
+    "chart.js": "4.5.1",
+    "lucide": "1.25.0"
+  }
+}

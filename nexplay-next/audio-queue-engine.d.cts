@@ -1,0 +1,11 @@
+export const advance: (...args: any[]) => any;
+export const buildShuffleOrder: (...args: any[]) => any;
+export const currentEntry: (...args: any[]) => any;
+export const insertPlayNext: (...args: any[]) => any;
+export const insertToEnd: (...args: any[]) => any;
+export const moveEntry: (...args: any[]) => any;
+export const normalizeEntries: (...args: any[]) => any;
+export const normalizeState: (...args: any[]) => any;
+export const removeEntry: (...args: any[]) => any;
+export const rewind: (...args: any[]) => any;
+export const upcomingEntries: (...args: any[]) => any;

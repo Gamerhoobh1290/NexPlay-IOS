@@ -1,0 +1,41 @@
+[build]
+  command = "npm run build:web-site"
+  publish = "output/nexplay-web-site"
+
+# build:web-site uses only Node builtins, so the devDependencies (Electron and
+# electron-builder, ~200MB) are dead weight on a deploy and a common cause of
+# install timeouts. Skip them.
+[build.environment]
+  NODE_VERSION = "22"
+  NPM_FLAGS = "--omit=dev --no-audit --no-fund"
+
+[[redirects]]
+  from = "/"
+  to = "/NexPlay.html"
+  status = 200
+  force = true
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/NexPlay.mobile.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/NexPlay.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/manifest.iphone.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
