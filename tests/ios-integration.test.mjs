@@ -70,6 +70,26 @@ test('no provider API key is baked into a publicly served source file', () => {
     assert.match(read('js/legacy/runtime-config.js'), /const YOUTUBE_DATA_API_KEY = '';/);
 });
 
+test('the viewport scale is pinned so iOS cannot zoom the shell', () => {
+    assert.match(mobile, /name="viewport"[^>]*maximum-scale=1\.0[^>]*user-scalable=no/);
+    assert.match(mobile, /touch-action:\s*pan-x pan-y/);
+
+    // iOS force-zooms on focusing any control under 16px and never returns, so
+    // the override must beat Tailwind's .text-sm/.text-xs class specificity.
+    const coarseBlocks = [...mobile.matchAll(/@media \(pointer: coarse\) \{[\s\S]*?\n        \}/g)].map((match) => match[0]);
+    const inputBlock = coarseBlocks.find((block) => /\binput,/.test(block));
+    assert.ok(inputBlock, 'expected a pointer:coarse block sizing form controls');
+    assert.match(inputBlock, /font-size:\s*16px\s*!important/);
+
+    // Safari ignores user-scalable=no; only these gesture events stop a pinch,
+    // and they are inert unless the listener is non-passive.
+    assert.match(mobile, /'gesturestart', 'gesturechange', 'gestureend'/);
+    assert.match(mobile, /\{ passive: false \}/);
+    assert.match(mobile, /lockViewportScale\(\);/);
+    // A touchend preventDefault would swallow the click on transport buttons.
+    assert.doesNotMatch(mobile, /addEventListener\('touchend'[\s\S]{0,200}preventDefault/);
+});
+
 test('iOS is told to tap the embed rather than shown a stalling connect message', () => {
     // iOS blocks playVideo() from script, so the generic "connecting" copy just
     // stalls for 12s before failing. Both the status line and the timeout
@@ -90,13 +110,16 @@ test('iPhone shell suppresses the WKWebView touch tells', () => {
 });
 
 test('transport controls meet the 44pt touch target minimum on touch devices', () => {
-    const coarse = mobile.match(/@media \(pointer: coarse\) \{[\s\S]*?\n        \}/);
+    // There is more than one pointer:coarse block, so select the one that
+    // actually sizes the transport rather than assuming source order.
+    const blocks = [...mobile.matchAll(/@media \(pointer: coarse\) \{[\s\S]*?\n        \}/g)].map((match) => match[0]);
+    const coarse = blocks.find((block) => block.includes('#mini-play-toggle'));
     assert.ok(coarse, 'expected a pointer:coarse block sizing the transport controls');
     for (const id of ['#mini-play-toggle', '#mini-prev-btn', '#mini-next-btn', '#shuffle-btn', '#repeat-btn']) {
-        assert.ok(coarse[0].includes(id), `${id} should get a 44pt touch target`);
+        assert.ok(coarse.includes(id), `${id} should get a 44pt touch target`);
     }
-    assert.match(coarse[0], /min-width:\s*44px/);
-    assert.match(coarse[0], /min-height:\s*44px/);
+    assert.match(coarse, /min-width:\s*44px/);
+    assert.match(coarse, /min-height:\s*44px/);
 });
 
 test('iOS Online Music uses device configuration and shared Desktop relevance logic', () => {

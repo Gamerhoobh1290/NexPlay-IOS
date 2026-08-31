@@ -2,7 +2,7 @@
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>NexPlay</title>
     <meta name="theme-color" content="#06b6d4">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -97,6 +97,26 @@
         /* Artwork must not raise the iOS "Save Image" sheet on long-press. */
         img {
             -webkit-touch-callout: none;
+        }
+
+        /* Keep the viewport fixed. iOS ignores user-scalable=no in Safari, so
+           the scale has to be pinned from CSS and the gesture events instead. */
+        html,
+        body {
+            touch-action: pan-x pan-y;
+        }
+
+        @media (pointer: coarse) {
+            /* iOS force-zooms the page when a focused control computes under
+               16px, and never zooms back out. This is the real cause of the
+               page "zooming in on the simplest thing" -- tapping a field. */
+            /* !important is required: Tailwind's .text-sm/.text-xs utilities
+               are class selectors and would otherwise win over this. */
+            input,
+            select,
+            textarea {
+                font-size: 16px !important;
+            }
         }
 
         /* Track titles and artist names stay selectable/copyable. */
@@ -5230,6 +5250,21 @@ isQueueOverlayOpen: false
         function getPreferredPlaybackSpeedForTrack(track = null) {
             const prefs = getAppSettings().playback;
             return track?.type === 'video' ? prefs.speedVideo : prefs.speedAudio;
+        }
+
+        function lockViewportScale() {
+            if (window.__nexplayViewportScaleLocked) return;
+            window.__nexplayViewportScaleLocked = true;
+            // Safari ignores user-scalable=no, and only these non-standard
+            // gesture events actually carry a pinch. Passive must stay false or
+            // preventDefault is a no-op.
+            ['gesturestart', 'gesturechange', 'gestureend'].forEach((eventName) => {
+                document.addEventListener(eventName, (event) => {
+                    event.preventDefault();
+                }, { passive: false });
+            });
+            // Double-tap zoom is already handled by touch-action above; a
+            // touchend preventDefault here would swallow the following click.
         }
 
         function configureIPhoneBackgroundMediaRuntime() {
@@ -12757,6 +12792,7 @@ isQueueOverlayOpen: false
 
         // --- INITIALIZATION ---
         async function init() {
+            lockViewportScale();
             configureIPhoneBackgroundMediaRuntime();
             // Load Persistence
             const saved = localStorage.getItem('nexplay_pro_state');
