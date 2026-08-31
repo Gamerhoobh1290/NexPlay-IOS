@@ -9673,7 +9673,12 @@ isQueueOverlayOpen: false
             if (status) {
                 if (!current) status.textContent = 'The bottom NexPlay player handles playback, progress, shuffle, repeat, and volume.';
                 else if (online.pendingTrackId && online.pendingTrackId === current.id) status.textContent = 'Desktop MP3 download queued. Playback stays in the shared bottom player.';
-                else if (isConnecting) status.textContent = 'Connecting this stream to the shared NexPlay player...';
+                // iOS refuses playVideo() from script: a tap on our own button is
+                // not a user gesture inside the cross-origin YouTube frame. Say so
+                // immediately instead of showing "connecting" for 12s and failing.
+                else if (isConnecting) status.textContent = isIOSWebKitRuntime()
+                    ? 'iOS blocks automatic start. Tap the play button on the video below to begin.'
+                    : 'Connecting this stream to the shared NexPlay player...';
                 else if (online.isPlaying) status.textContent = isSaved ? 'Playing now through the bottom player. This stream is also saved in your library.' : 'Playing now through the bottom player.';
                 else status.textContent = isSaved ? 'Saved streaming track ready to resume from the bottom player.' : 'Ready to play from the bottom player.';
             }
@@ -9785,8 +9790,11 @@ isQueueOverlayOpen: false
                 updatePlayIcons();
                 syncOnlineMusicPlayerCard();
                 persistOnlineMusicState();
+                const blockedHint = isIOSWebKitRuntime()
+                    ? 'Tap the play button on the video itself — iOS will not let NexPlay start it for you.'
+                    : 'Tap Play again if your browser blocked automatic start.';
                 updateOnlineMusicFeedback(
-                    current ? `"${current.title}" is ready. Tap Play again if your browser blocked automatic start.` : 'Online stream is ready. Tap Play again if your browser blocked automatic start.',
+                    current ? `"${current.title}" is ready. ${blockedHint}` : `Online stream is ready. ${blockedHint}`,
                     'warn'
                 );
             }, 12000);

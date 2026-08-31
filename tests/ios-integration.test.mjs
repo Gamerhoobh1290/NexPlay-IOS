@@ -70,6 +70,15 @@ test('no provider API key is baked into a publicly served source file', () => {
     assert.match(read('js/legacy/runtime-config.js'), /const YOUTUBE_DATA_API_KEY = '';/);
 });
 
+test('iOS is told to tap the embed rather than shown a stalling connect message', () => {
+    // iOS blocks playVideo() from script, so the generic "connecting" copy just
+    // stalls for 12s before failing. Both the status line and the timeout
+    // warning must name the real action on iOS.
+    assert.match(mobile, /isConnecting\) status\.textContent = isIOSWebKitRuntime\(\)/);
+    assert.match(mobile, /Tap the play button on the video below to begin/);
+    assert.match(mobile, /iOS will not let NexPlay start it for you/);
+});
+
 test('iPhone shell suppresses the WKWebView touch tells', () => {
     assert.match(mobile, /-webkit-text-size-adjust:\s*100%/);
     assert.match(mobile, /-webkit-tap-highlight-color:\s*transparent/);
