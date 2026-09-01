@@ -25766,7 +25766,18 @@ isQueueOverlayOpen: false
         // default browser error handler from executing.
         window.addEventListener('error', (event) => {
             try {
-                const msg = event.message || 'Unknown error';
+                const msg = sanitizeText(event.message || '');
+                // A script error raised inside a cross-origin frame reaches us stripped
+                // of everything useful: the literal text "Script error." with no file,
+                // line, or column. The YouTube embed raises these routinely, so a toast
+                // only tells the listener that something unnamed went wrong somewhere.
+                const isOpaqueForeignError = !msg
+                    || /^script error\.?$/i.test(msg)
+                    || (!event.filename && !event.lineno && !event.colno);
+                if (isOpaqueForeignError) {
+                    console.warn('[NexPlay] Ignored an opaque cross-origin script error.');
+                    return;
+                }
                 showToast(`Error: ${msg}`, 'error');
             } catch(_) {}
         });

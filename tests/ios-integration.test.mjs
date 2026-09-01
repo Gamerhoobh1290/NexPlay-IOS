@@ -146,6 +146,14 @@ test('the bundled worker leaves cross-origin requests to the browser', () => {
     assert.doesNotMatch(worker, /isSameOrigin\s*\?\s*networkFirst/);
 });
 
+test('an opaque cross-origin script error is not shown as a toast', () => {
+    // The YouTube embed raises "Script error." with no file/line/column, which says
+    // nothing the listener can act on. Real errors must still surface.
+    assert.match(mobile, /\^script error\\.\?\$\/i\.test\(msg\)/);
+    assert.match(mobile, /!event\.filename && !event\.lineno && !event\.colno/);
+    assert.match(mobile, /showToast\(`Error: \$\{msg\}`, 'error'\)/);
+});
+
 test('the mobile library exposes playlists instead of bouncing back to All', () => {
     assert.match(mobile, /\{ id: 'playlists', label: 'Playlists' \}/);
     assert.ok(MOBILE_ALLOWED_TABS_SOURCE.includes("'playlists'"), 'playlists must be an allowed mobile tab');
