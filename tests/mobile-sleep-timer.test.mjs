@@ -31,11 +31,11 @@ function extractFunction(name) {
 function loadSleepTimer({ sleepLabel = null, pauseTransport } = {}) {
     const state = { sleepTimer: null, sleepTimerEndsAt: 0, sleepTimerMinutes: 0, isPlaying: true, activeTab: 'settings' };
     const els = { sleepLabel, audio: { paused: false, pause() { this.paused = true; } } };
-    const calls = { pause: 0, updatePlayIcons: 0, toasts: [], renders: 0 };
+    const calls = { pause: 0, updatePlayIcons: 0, toasts: [], renders: 0, wakeLockSyncs: 0 };
 
     const factory = new Function(
         'state', 'els', 'document', 'showToast', 'updatePlayIcons',
-        'renderSettingsTab', 'pauseActivePlaybackTransport', 'calls',
+        'renderSettingsTab', 'pauseActivePlaybackTransport', 'syncScreenWakeLock', 'calls',
         `${extractFunction('setSleepTimer')}
          ${extractFunction('getSleepTimerRemainingMinutes')}
          ${extractFunction('syncSleepTimerSurface')}
@@ -52,6 +52,7 @@ function loadSleepTimer({ sleepLabel = null, pauseTransport } = {}) {
         pauseTransport === undefined
             ? undefined
             : () => { calls.pause += 1; pauseTransport?.(); },
+        () => { calls.wakeLockSyncs += 1; },
         calls
     );
     return { ...api, state, els, calls };
@@ -91,6 +92,9 @@ test('an elapsed sleep timer pauses the active transport and clears its state', 
         assert.equal(timer.state.sleepTimerMinutes, 0);
         assert.equal(timer.state.sleepTimerEndsAt, 0);
         assert.equal(timer.calls.toasts.length, 1);
+        // A wake lock held to keep an online stream alive has to be dropped here,
+        // or the sleep timer stops the music and leaves the screen burning.
+        assert.equal(timer.calls.wakeLockSyncs, 1, 'should release the screen wake lock');
     } finally {
         mock.timers.reset();
     }

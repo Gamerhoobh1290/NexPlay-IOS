@@ -3594,6 +3594,7 @@
         const YOUTUBE_EMBED_HOST = 'https://www.youtube.com';
         const ONLINE_MUSIC_EMBED_MIN_VIEWPORT_PX = 220;
         const ONLINE_MUSIC_PLAYER_READY_TIMEOUT_MS = 8000;
+        const KEEP_SCREEN_AWAKE_NOTE = 'Online streams stop when the phone sleeps, because the YouTube player is not NexPlay’s to keep alive. This holds the screen on so they keep going — pair it with the sleep timer and turn the brightness down.';
         const ONLINE_BACKGROUND_PLAYBACK_NOTE = isIOSNativeRuntime()
             ? 'The iPhone app connects playback to the lock screen and Control Center. YouTube-backed streams can still be interrupted by provider or network restrictions.'
             : 'Online streams use your browser media engine. Installed web apps usually behave best, but some phones may still stop YouTube-backed audio on the lock screen.';
@@ -3807,7 +3808,8 @@
                     skipIntroSeconds: 0,
                     skipOutroSeconds: 0,
                     backgroundPlayback: true,
-                    pauseWhenHidden: false
+                    pauseWhenHidden: false,
+                    keepScreenAwake: false
                 },
                 resume: {
                     localEnabled: true,
@@ -3914,7 +3916,8 @@
                     skipIntroSeconds: clampNumber(playback.skipIntroSeconds, 0, 120, base.playback.skipIntroSeconds),
                     skipOutroSeconds: clampNumber(playback.skipOutroSeconds, 0, 120, base.playback.skipOutroSeconds),
                     backgroundPlayback: normalizedPlayback.backgroundPlayback,
-                    pauseWhenHidden: normalizedPlayback.pauseWhenHidden
+                    pauseWhenHidden: normalizedPlayback.pauseWhenHidden,
+                    keepScreenAwake: playback.keepScreenAwake ?? base.playback.keepScreenAwake
                 },
                 resume: {
                     localEnabled: resume.localEnabled ?? base.resume.localEnabled,
@@ -4286,6 +4289,8 @@ isQueueOverlayOpen: false
             let onlineMusicSessionId = 0;
             let onlineMusicPrewarmRequested = false;
             let onlineMusicShellTrackingFrame = 0;
+            let screenWakeLockSentinel = null;
+            let screenWakeLockPending = false;
             let onlineMusicSurfaceSyncFrame = 0;
             // iOS refuses playback that a script starts inside a cross-origin frame.
             // Once a tap inside the YouTube frame has started a video the frame keeps
@@ -7433,7 +7438,7 @@ isQueueOverlayOpen: false
                     else if (typeof onlineMusicPlayer.pauseVideo === 'function') onlineMusicPlayer.pauseVideo();
                 } catch (_) {}
             }
-            syncMediaSessionPlaybackState();
+            syncPlatformPlaybackState();
         }
 
         function syncOnlineMusicResultRows() {
@@ -10016,7 +10021,7 @@ isQueueOverlayOpen: false
                 lastOnlineMusicPersistTs = now;
                 persistOnlineMusicState();
             }
-            if (playbackStateChanged) syncMediaSessionPlaybackState();
+            if (playbackStateChanged) syncPlatformPlaybackState();
         }
 
         function startOnlineMusicProgressTimer() {
@@ -10819,7 +10824,7 @@ isQueueOverlayOpen: false
             refreshPlayingIndicators();
             persistOnlineMusicState();
             refreshQueueViews();
-            syncMediaSessionPlaybackState();
+            syncPlatformPlaybackState();
         }
 
         async function playAdjacentOnlineMusic(offset) {
@@ -13861,7 +13866,7 @@ isQueueOverlayOpen: false
                     if (!forceBackgroundPlayback && getAppSettings().playback.backgroundPlayback === false && state.isPlaying) {
                         visibilityPauseTriggered = pauseActivePlaybackTransport({ captureProgress: true });
                     } else if (forceBackgroundPlayback && state.isPlaying) {
-                        syncMediaSessionPlaybackState();
+                        syncPlatformPlaybackState();
                     }
                     captureOnlineMusicProgress({ forcePersist: true, syncPlaybackState: !visibilityPauseTriggered });
                     const track = getCurrentTrack();
@@ -13871,10 +13876,11 @@ isQueueOverlayOpen: false
                     return;
                 }
                 visibilityPauseTriggered = false;
+                syncScreenWakeLock();
                 if (isOnlineMusicPlaybackActive()) {
                     scheduleOnlineMusicVisibilityResync();
                 } else {
-                    syncMediaSessionPlaybackState();
+                    syncPlatformPlaybackState();
                 }
             });
 	        }
@@ -15877,7 +15883,7 @@ isQueueOverlayOpen: false
                 getCachedElement('fsModeCoverArt')?.parentElement
             ].filter(Boolean);
             wraps.forEach(wrap => wrap.classList.toggle('scale-[1.02]', !!state.isPlaying));
-            syncMediaSessionPlaybackState();
+            syncPlatformPlaybackState();
         }
 
         // --- ADVANCED AUDIO (EQ & VISUALIZER) ---
@@ -16305,6 +16311,7 @@ isQueueOverlayOpen: false
                     }
                     state.isPlaying = false;
                     updatePlayIcons();
+                    syncScreenWakeLock();
                     if (els.sleepLabel) els.sleepLabel.textContent = 'Sleep';
                     showToast('Sleep timer ended playback.', 'info');
                     syncSleepTimerSurface();
@@ -16913,6 +16920,7 @@ isQueueOverlayOpen: false
             visualizerIntensity: 'Controls how strong the visual motion and audio-reactive effects feel. Higher values look more energetic, lower values feel calmer.',
             reducedMotion: 'Turns down most animations and hover movement. This can make the interface feel steadier and more comfortable if motion is distracting.',
             autoplayOnTrackClick: 'When this is on, selecting a track starts playback right away. When it is off, the track loads first and waits for you to press play.',
+            keepScreenAwake: 'Holds a screen wake lock while something is playing, so the phone does not sleep and cut an online stream off. It is released as soon as playback stops, including when the sleep timer ends it.',
             backgroundPlayback: 'Keeps playback running while NexPlay is still open in the background, similar to a phone music app. Online streams still depend on browser support and work best in Chrome or an installed PWA.',
             seekStepSeconds: 'Sets how far NexPlay jumps when you use skip or seek controls. Larger values move faster through a track, smaller values feel more precise.',
             speedAudio: 'Sets the normal playback speed for songs, podcasts, and other audio files. A value of 1.00x means the sound plays at its natural speed.',
@@ -18193,6 +18201,9 @@ isQueueOverlayOpen: false
                             <div class="mt-1 text-[11px] leading-5 text-gray-500">${escapeHtml(sleepTimerStatusLabel)}</div>
                             <div class="mt-3 flex flex-wrap gap-2">${sleepTimerChoices}</div>
                         </div>
+                        <div class="mt-4 space-y-3">
+                            ${renderMobileSettingsToggle('Keep screen on while playing', KEEP_SCREEN_AWAKE_NOTE, playbackPrefs.keepScreenAwake === true, `setAppSettingValue('playback','keepScreenAwake', this.checked, { rerenderSettings: true })`)}
+                        </div>
                         <label class="block mt-4 text-sm font-bold text-white">
                             Seek step
                             <select class="mobile-settings-select" onchange="setAppSettingValue('playback','seekStepSeconds', Number(this.value), { rerenderSettings: true })">
@@ -18390,6 +18401,13 @@ isQueueOverlayOpen: false
                                 <span class="block text-[11px] text-gray-500 mt-2">${escapeHtml(ONLINE_BACKGROUND_PLAYBACK_NOTE)}</span>
                             </span>
                             <input type="checkbox" class="mt-1 h-4 w-4 accent-cyan-500" ${playbackPrefs.backgroundPlayback !== false ? 'checked' : ''} ${isIOSWebKitRuntime() ? 'disabled' : ''} onchange="setAppSettingValue('playback','backgroundPlayback', this.checked, { rerenderSettings: true })">
+                        </label>
+                        <label class="flex items-start justify-between gap-3">
+                            <span class="min-w-0">
+                                ${renderSettingCardTitle('Keep Screen On While Playing', help.keepScreenAwake)}
+                                <span class="block text-[11px] text-gray-500 mt-2">${escapeHtml(KEEP_SCREEN_AWAKE_NOTE)}</span>
+                            </span>
+                            <input type="checkbox" class="mt-1 h-4 w-4 accent-cyan-500" ${playbackPrefs.keepScreenAwake === true ? 'checked' : ''} onchange="setAppSettingValue('playback','keepScreenAwake', this.checked, { rerenderSettings: true })">
                         </label>
                     </section>
                     <section class="holo-panel rounded-2xl p-5 flex flex-col gap-4">
@@ -20725,11 +20743,61 @@ isQueueOverlayOpen: false
             updateProgress();
         }
 
+        // iOS suspends a backgrounded web view, and a cross-origin YouTube frame is
+        // beyond the reach of Media Session or navigator.audioSession. Holding a screen
+        // wake lock keeps the page foregrounded so an online stream survives until the
+        // sleep timer stops it. The lock is dropped the moment playback stops.
+        function canUseScreenWakeLock() {
+            return typeof navigator !== 'undefined'
+                && !!navigator.wakeLock
+                && typeof navigator.wakeLock.request === 'function';
+        }
+
+        function shouldHoldScreenWakeLock() {
+            if (!canUseScreenWakeLock()) return false;
+            if (getAppSettings().playback.keepScreenAwake !== true) return false;
+            if (document.visibilityState !== 'visible') return false;
+            return !!getActivePlaybackTrack() && !!state.isPlaying;
+        }
+
+        async function syncScreenWakeLock() {
+            const wanted = shouldHoldScreenWakeLock();
+            if (wanted === !!screenWakeLockSentinel) return;
+            if (!wanted) {
+                const sentinel = screenWakeLockSentinel;
+                screenWakeLockSentinel = null;
+                try { await sentinel?.release(); } catch (_) {}
+                return;
+            }
+            if (screenWakeLockPending) return;
+            screenWakeLockPending = true;
+            try {
+                const sentinel = await navigator.wakeLock.request('screen');
+                // The platform releases the lock on its own whenever the page is
+                // hidden, so drop the handle and let the next sync re-request it.
+                sentinel.addEventListener('release', () => {
+                    if (screenWakeLockSentinel === sentinel) screenWakeLockSentinel = null;
+                }, { once: true });
+                screenWakeLockSentinel = sentinel;
+                if (!shouldHoldScreenWakeLock()) {
+                    screenWakeLockSentinel = null;
+                    try { await sentinel.release(); } catch (_) {}
+                }
+            } catch (_) {
+                screenWakeLockSentinel = null;
+            } finally {
+                screenWakeLockPending = false;
+            }
+        }
+
         function canUseMediaSession() {
             return typeof navigator !== 'undefined' && 'mediaSession' in navigator;
         }
 
-        function syncMediaSessionPlaybackState() {
+        // Every playback transition reports to the platform here: Media Session for the
+        // lock-screen controls, and the wake lock for keeping the session alive.
+        function syncPlatformPlaybackState() {
+            syncScreenWakeLock();
             if (!canUseMediaSession()) return;
             const activeTrack = getActivePlaybackTrack();
             const onlineSnapshot = isOnlineMusicPlaybackActive() ? getOnlineMusicPlayerSnapshot() : null;
@@ -20764,13 +20832,13 @@ isQueueOverlayOpen: false
                 syncOnlineMusicPlayerCard();
                 if (opts.captureProgress) captureOnlineMusicProgress({ forcePersist: true, syncPlaybackState: false });
                 persistOnlineMusicState();
-                syncMediaSessionPlaybackState();
+                syncPlatformPlaybackState();
                 return true;
             }
             if (!aud || aud.paused) return false;
             try {
                 aud.pause();
-                syncMediaSessionPlaybackState();
+                syncPlatformPlaybackState();
                 return true;
             } catch (_) {
                 return false;
@@ -20833,7 +20901,7 @@ isQueueOverlayOpen: false
                         return playAttempt;
                     })
                     .catch(() => {})
-                    .finally(() => syncMediaSessionPlaybackState());
+                    .finally(() => syncPlatformPlaybackState());
             });
             setHandler('pause', () => {
                 pauseActivePlaybackTransport({ captureProgress: true });
@@ -20875,7 +20943,7 @@ isQueueOverlayOpen: false
                     artwork: art
                 });
             }
-            syncMediaSessionPlaybackState();
+            syncPlatformPlaybackState();
             updateMediaPositionState(true);
         }
         function updateMediaPositionState(force = false) {

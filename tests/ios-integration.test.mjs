@@ -154,6 +154,21 @@ test('an opaque cross-origin script error is not shown as a toast', () => {
     assert.match(mobile, /showToast\(`Error: \$\{msg\}`, 'error'\)/);
 });
 
+test('a screen wake lock can keep an online stream alive until the sleep timer', () => {
+    // iOS suspends a backgrounded web view and a cross-origin YouTube frame is beyond
+    // Media Session's reach, so holding the screen awake is the only lever the page has.
+    assert.match(mobile, /navigator\.wakeLock\.request\('screen'\)/);
+    assert.match(mobile, /keepScreenAwake: false/);
+    // Opt-in only, and never held while paused or hidden.
+    assert.match(mobile, /getAppSettings\(\)\.playback\.keepScreenAwake !== true\) return false;/);
+    assert.match(mobile, /document\.visibilityState !== 'visible'\) return false;/);
+    assert.match(mobile, /return !!getActivePlaybackTrack\(\) && !!state\.isPlaying;/);
+    // The sleep timer has to let the screen sleep again, or it defeats itself.
+    const sleep = mobile.slice(mobile.indexOf('function setSleepTimer('));
+    const timerBody = sleep.slice(0, sleep.indexOf('function getSleepTimerRemainingMinutes('));
+    assert.match(timerBody, /syncScreenWakeLock\(\);/);
+});
+
 test('the mobile library exposes playlists instead of bouncing back to All', () => {
     assert.match(mobile, /\{ id: 'playlists', label: 'Playlists' \}/);
     assert.ok(MOBILE_ALLOWED_TABS_SOURCE.includes("'playlists'"), 'playlists must be an allowed mobile tab');
