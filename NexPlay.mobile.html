@@ -1380,24 +1380,63 @@
             border: 0;
             display: block;
         }
-        #online-music-player-inline-anchor {
+        .online-music-player-anchor {
             width: 100%;
             max-width: 100%;
-        }
-        #online-music-player-inline-anchor .online-music-player-hidden.online-music-player-inline {
-            position: relative;
-            right: auto;
-            bottom: auto;
-            z-index: auto;
-            width: 100%;
-            height: auto;
             aspect-ratio: 16 / 9;
             margin-top: 0.75rem;
             border-radius: 0.9rem;
             background: #000;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+        }
+        /* The embed is positioned over its anchor instead of being appended to
+           it: re-parenting an iframe discards its browsing context, which drops
+           the YouTube player (and its iOS user-gesture unlock) mid-track. */
+        .online-music-player-hidden.online-music-player-inline {
+            right: auto;
+            bottom: auto;
             opacity: 1;
             pointer-events: auto;
-            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+            z-index: 20;
+            border-radius: 0.9rem;
+            background: #000;
+            transition: opacity 0.24s ease;
+        }
+        #online-music-ios-dock {
+            position: fixed;
+            left: 0.65rem;
+            right: 0.65rem;
+            bottom: calc(var(--mobile-shell-bottom-offset) + 0.1rem);
+            z-index: 19;
+            margin: 0 auto;
+            max-width: 32rem;
+            padding: 0.7rem 0.75rem 0.75rem;
+            border-radius: 1.25rem;
+            background: rgba(8, 11, 16, 0.94);
+            border: 1px solid rgba(var(--accent-rgb, 6, 182, 212), 0.28);
+            box-shadow: 0 24px 60px -28px rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            animation: nexplay-dock-rise 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        #online-music-ios-dock .online-music-ios-dock-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.6rem;
+            margin-bottom: 0.55rem;
+        }
+        #online-music-ios-dock .online-music-ios-dock-hint {
+            min-width: 0;
+            font-size: 0.68rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgb(var(--accent-rgb, 6, 182, 212));
+        }
+        @keyframes nexplay-dock-rise {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         /* Keyboard accessibility: visible focus rings */
@@ -2318,6 +2357,54 @@
         body.mobile-runtime .mobile-quick-action:active {
             transform: translateY(1px) scale(0.99);
         }
+        /* Smoothness pass: NexPlay's mobile shell replaces the tab body wholesale on
+           every render, so settle the new content in instead of snapping it, and give
+           every touch target the same easing. body.reduce-motion neutralises all of it. */
+        body.mobile-runtime #main-scroll-area {
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-y: contain;
+        }
+        body.mobile-runtime #mobile-filter-row {
+            scroll-snap-type: x proximity;
+            overscroll-behavior-x: contain;
+            scroll-padding-left: 0.25rem;
+        }
+        body.mobile-runtime #mobile-filter-row > * {
+            scroll-snap-align: start;
+        }
+        body.mobile-runtime button,
+        body.mobile-runtime .mobile-chip,
+        body.mobile-runtime .mobile-action-btn {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+        @keyframes nexplay-mobile-settle {
+            from { opacity: 0; transform: translate3d(0, 8px, 0); }
+            to { opacity: 1; transform: none; }
+        }
+        body.mobile-runtime #tracks-container > .mobile-home-stack,
+        body.mobile-runtime #tracks-container > .mobile-library-stack,
+        body.mobile-runtime #tracks-container > .mobile-search-stack,
+        body.mobile-runtime #tracks-container > .mobile-settings-stack,
+        body.mobile-runtime #tracks-container > .mobile-settings-card {
+            animation: nexplay-mobile-settle 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        body.mobile-runtime .mobile-track-card,
+        body.mobile-runtime .mobile-grid-card,
+        body.mobile-runtime .mobile-surface-card,
+        body.mobile-runtime .mobile-settings-card,
+        body.mobile-runtime .mobile-quick-action,
+        body.mobile-runtime .mobile-stat-pill {
+            transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease;
+        }
+        body.mobile-runtime .mobile-track-card:active,
+        body.mobile-runtime .mobile-grid-card:active {
+            transform: scale(0.985);
+        }
+        body.mobile-runtime #nav-container button {
+            transition: background 0.2s ease, color 0.2s ease, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease;
+        }
         body.mobile-runtime .mobile-empty-card {
             padding: 1rem;
         }
@@ -2823,7 +2910,7 @@
                                         <div id="online-music-current-title" class="mt-2 truncate text-sm font-black text-white">No track selected</div>
                                         <button id="online-music-current-artist" type="button" class="mt-1 truncate text-left text-xs font-mono text-cyan-200 transition hover:text-white disabled:cursor-default disabled:text-gray-500" disabled>Search YouTube and press play.</button>
                                         <p id="online-music-current-status" class="mt-2 text-xs leading-5 text-gray-400">The bottom NexPlay player handles playback, progress, shuffle, repeat, and volume.</p>
-                                        <div id="online-music-player-inline-anchor" class="hidden"></div>
+                                        <div id="online-music-player-inline-anchor" class="online-music-player-anchor hidden"></div>
                                     </div>
                                     <div class="rounded-xl border border-white/10 bg-black/25 p-3 space-y-2">
                                         <div class="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300/80">YouTube Music playlists</div>
@@ -3430,6 +3517,13 @@
     <video id="main-audio-element" class="nexplay-media-engine" crossorigin="anonymous" preload="auto" playsinline webkit-playsinline x-webkit-airplay="allow"></video>
     <div id="online-music-player-shell" class="online-music-player-hidden" aria-hidden="true">
         <div id="online-music-yt-player"></div>
+    </div>
+    <div id="online-music-ios-dock" class="hidden" aria-hidden="true">
+        <div class="online-music-ios-dock-head">
+            <div class="online-music-ios-dock-hint" id="online-music-ios-dock-hint">Tap play to start</div>
+            <button type="button" class="mobile-chip" onclick="dismissOnlineMusicIOSDock()">Hide</button>
+        </div>
+        <div id="online-music-player-dock-anchor" class="online-music-player-anchor" style="margin-top:0"></div>
     </div>
 
     <script src="./nexplay-next/legacy-online-music-helpers.cjs"></script>
@@ -4189,6 +4283,13 @@ isQueueOverlayOpen: false
             let lastOnlineMusicPersistTs = 0;
             let onlineMusicSessionId = 0;
             let onlineMusicPrewarmRequested = false;
+            let onlineMusicShellTrackingFrame = 0;
+            let onlineMusicSurfaceSyncFrame = 0;
+            // iOS refuses playback that a script starts inside a cross-origin frame.
+            // Once a tap inside the YouTube frame has started a video the frame keeps
+            // that permission, so later tracks can be started programmatically.
+            let onlineMusicEmbedGestureUnlocked = false;
+            let onlineMusicIOSDockDismissed = false;
             const onlineMusicFailedTrackCache = new Map();
             const activeSeekSliderIds = new Set();
             let onlineMusicPlaybackAttemptSeq = 0;
@@ -9649,30 +9750,111 @@ isQueueOverlayOpen: false
             removeFromPlaylist(playlistId, trackId);
         }
 
+        // The YouTube embed never moves in the DOM: re-parenting an iframe discards
+        // its browsing context, so the YT player object goes stale and iOS loses the
+        // in-frame user gesture that permits playback. It stays a body child and is
+        // positioned over whichever anchor should currently show it.
+        function getOnlineMusicPlayerAnchor() {
+            const shell = document.getElementById('online-music-player-shell');
+            if (!shell || !shell.classList.contains('online-music-player-inline')) return null;
+            const id = shell.dataset.nexplayAnchorId || '';
+            const anchor = id ? document.getElementById(id) : null;
+            return anchor && anchor.isConnected && !anchor.classList.contains('hidden') ? anchor : null;
+        }
+
+        function positionOnlineMusicPlayerShell() {
+            const shell = document.getElementById('online-music-player-shell');
+            const anchor = getOnlineMusicPlayerAnchor();
+            if (!shell || !anchor) return;
+            const rect = anchor.getBoundingClientRect();
+            if (!rect.width || !rect.height) return;
+            const box = [Math.round(rect.left), Math.round(rect.top), Math.round(rect.width), Math.round(rect.height)].join(',');
+            if (shell.dataset.nexplayAnchorBox === box) return;
+            shell.dataset.nexplayAnchorBox = box;
+            shell.style.left = `${Math.round(rect.left)}px`;
+            shell.style.top = `${Math.round(rect.top)}px`;
+            shell.style.width = `${Math.round(rect.width)}px`;
+            shell.style.height = `${Math.round(rect.height)}px`;
+        }
+
+        function startOnlineMusicPlayerShellTracking() {
+            if (onlineMusicShellTrackingFrame) return;
+            const step = () => {
+                if (!getOnlineMusicPlayerAnchor()) {
+                    onlineMusicShellTrackingFrame = 0;
+                    return;
+                }
+                positionOnlineMusicPlayerShell();
+                onlineMusicShellTrackingFrame = requestAnimationFrame(step);
+            };
+            onlineMusicShellTrackingFrame = requestAnimationFrame(step);
+        }
+
+        function shouldShowOnlineMusicIOSDock(current) {
+            return !!current
+                && isIOSWebKitRuntime()
+                && document.body.classList.contains('mobile-runtime')
+                && !onlineMusicEmbedGestureUnlocked
+                && !onlineMusicIOSDockDismissed;
+        }
+
+        function dismissOnlineMusicIOSDock() {
+            onlineMusicIOSDockDismissed = true;
+            syncOnlineMusicPlayerSurface();
+        }
+
         function syncOnlineMusicPlayerSurface(current = getOnlineMusicCurrentTrack(), options = {}) {
             const shell = document.getElementById('online-music-player-shell');
             if (!shell) return;
-            const anchor = document.getElementById('online-music-player-inline-anchor');
+            const inlineAnchor = document.getElementById('online-music-player-inline-anchor');
+            const dock = document.getElementById('online-music-ios-dock');
+            const dockAnchor = document.getElementById('online-music-player-dock-anchor');
+            const isMobile = document.body.classList.contains('mobile-runtime');
             const showInline = !options.forceHidden
-                && document.body.classList.contains('mobile-runtime')
+                && isMobile
                 && state.activeTab === 'online-music'
                 && !!current
-                && !!anchor;
-            if (showInline) {
-                anchor.classList.remove('hidden');
-                shell.classList.add('online-music-player-inline');
-                shell.setAttribute('aria-hidden', 'false');
-                if (shell.parentElement !== anchor) {
-                    anchor.appendChild(shell);
-                }
+                && !!inlineAnchor;
+            // Away from the Online tab an iOS listener has no embed to tap, so the
+            // stream can never start. Float the same embed above the player bar
+            // until the frame has been unlocked by a tap.
+            const showDock = !options.forceHidden
+                && !showInline
+                && !!dock
+                && !!dockAnchor
+                && shouldShowOnlineMusicIOSDock(current);
+            const activeAnchor = showInline ? inlineAnchor : (showDock ? dockAnchor : null);
+
+            if (inlineAnchor) inlineAnchor.classList.toggle('hidden', !showInline);
+            if (dock) {
+                dock.classList.toggle('hidden', !showDock);
+                dock.setAttribute('aria-hidden', showDock ? 'false' : 'true');
+            }
+            if (showDock) {
+                const hint = document.getElementById('online-music-ios-dock-hint');
+                if (hint) hint.textContent = `Tap play to start "${current.title || 'this track'}"`;
+            }
+
+            if (!activeAnchor) {
+                shell.classList.remove('online-music-player-inline');
+                shell.removeAttribute('data-nexplay-anchor-id');
+                shell.removeAttribute('data-nexplay-anchor-box');
+                shell.setAttribute('aria-hidden', 'true');
+                shell.style.left = '';
+                shell.style.top = '';
+                shell.style.width = '';
+                shell.style.height = '';
                 return;
             }
-            if (anchor) anchor.classList.add('hidden');
-            shell.classList.remove('online-music-player-inline');
-            shell.setAttribute('aria-hidden', 'true');
-            if (shell.parentElement !== document.body) {
-                document.body.appendChild(shell);
+            if (shell.dataset.nexplayAnchorId !== activeAnchor.id) {
+                shell.dataset.nexplayAnchorId = activeAnchor.id;
+                shell.removeAttribute('data-nexplay-anchor-box');
             }
+            shell.classList.add('online-music-player-inline');
+            shell.setAttribute('aria-hidden', 'false');
+            positionOnlineMusicPlayerShell();
+            requestAnimationFrame(positionOnlineMusicPlayerShell);
+            startOnlineMusicPlayerShellTracking();
         }
 
         function scrollOnlineMusicPlayerSurfaceIntoView() {
@@ -9714,8 +9896,8 @@ isQueueOverlayOpen: false
                 // iOS refuses playVideo() from script: a tap on our own button is
                 // not a user gesture inside the cross-origin YouTube frame. Say so
                 // immediately instead of showing "connecting" for 12s and failing.
-                else if (isConnecting) status.textContent = isIOSWebKitRuntime()
-                    ? 'iOS blocks automatic start. Tap the play button on the video below to begin.'
+                else if (isConnecting) status.textContent = (isIOSWebKitRuntime() && !onlineMusicEmbedGestureUnlocked)
+                    ? 'iOS blocks automatic start. Tap play on the video once and the rest of your queue starts on its own.'
                     : 'Connecting this stream to the shared NexPlay player...';
                 else if (online.isPlaying) status.textContent = isSaved ? 'Playing now through the bottom player. This stream is also saved in your library.' : 'Playing now through the bottom player.';
                 else status.textContent = isSaved ? 'Saved streaming track ready to resume from the bottom player.' : 'Ready to play from the bottom player.';
@@ -9828,14 +10010,14 @@ isQueueOverlayOpen: false
                 updatePlayIcons();
                 syncOnlineMusicPlayerCard();
                 persistOnlineMusicState();
-                const blockedHint = isIOSWebKitRuntime()
-                    ? 'Tap the play button on the video itself — iOS will not let NexPlay start it for you.'
+                const blockedHint = (isIOSWebKitRuntime() && !onlineMusicEmbedGestureUnlocked)
+                    ? 'Tap play on the video NexPlay just opened — iOS only lets the video itself start the first stream.'
                     : 'Tap Play again if your browser blocked automatic start.';
                 updateOnlineMusicFeedback(
                     current ? `"${current.title}" is ready. ${blockedHint}` : `Online stream is ready. ${blockedHint}`,
                     'warn'
                 );
-            }, 12000);
+            }, (isIOSWebKitRuntime() && !onlineMusicEmbedGestureUnlocked) ? 3500 : 12000);
         }
 
         function scheduleOnlineMusicVisibilityResync(delay = 160) {
@@ -9900,6 +10082,9 @@ isQueueOverlayOpen: false
                 return;
             }
             if (event?.data === YTState.PLAYING) {
+                // The frame has now played under a real gesture, so NexPlay may drive
+                // it from script for the rest of this page's life.
+                onlineMusicEmbedGestureUnlocked = true;
                 clearOnlineMusicConnectTimeout();
                 stopLocalMediaTransport();
                 state.currentPlaybackSource = 'online-music';
@@ -10339,6 +10524,7 @@ isQueueOverlayOpen: false
             state.currentTrack = libraryTrack ? { ...libraryTrack } : { ...resolved, resumePosition: 0, resumeUpdatedAt: 0 };
             online.currentTrack = { ...(libraryTrack || resolved), resumePosition: 0, resumeUpdatedAt: 0 };
             online.connectingTrackId = shouldAutoplay ? resolved.id : null;
+            if (shouldAutoplay) onlineMusicIOSDockDismissed = false;
             online.currentTime = Math.max(0, Number(options.startTime) || 0);
             online.duration = Math.max(0, Number(libraryTrack?.duration || resolved.duration) || 0);
             applyNowPlayingMetadata(libraryTrack || resolved);
@@ -17139,9 +17325,20 @@ isQueueOverlayOpen: false
             slot.parent.insertBefore(hub, reference);
         }
 
+        function scheduleOnlineMusicPlayerSurfaceSync() {
+            if (onlineMusicSurfaceSyncFrame) return;
+            onlineMusicSurfaceSyncFrame = requestAnimationFrame(() => {
+                onlineMusicSurfaceSyncFrame = 0;
+                syncOnlineMusicPlayerSurface();
+            });
+        }
+
         function restoreMobileInlineHubs() {
             syncOnlineMusicPlayerSurface(null, { forceHidden: true });
             restoreMobileInlineHub('online-music-hub');
+            // The render that follows rebuilds the tab body; re-evaluate the embed
+            // surface once it is in place so the iOS dock can show off the Online tab.
+            scheduleOnlineMusicPlayerSurfaceSync();
         }
 
         function mountMobileInlineHub(hubId, mountId) {
@@ -24911,9 +25108,6 @@ isQueueOverlayOpen: false
 
         function normalizeMobileActiveTab() {
             if (!MOBILE_ALLOWED_TABS.has(state.activeTab)) {
-                state.activeTab = 'all';
-            }
-            if (document.body.classList.contains('mobile-beginner') && state.activeTab === 'playlists') {
                 state.activeTab = 'all';
             }
             if (mobilePrimaryTabOverride === 'home' && !isMobileLibraryTab(state.activeTab)) {

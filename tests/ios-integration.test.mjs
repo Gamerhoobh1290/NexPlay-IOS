@@ -16,6 +16,8 @@ const project = read('ios/NexPlay/NexPlay.xcodeproj/project.pbxproj');
 
 const iphoneSiteBuild = read('scripts/build-iphone-site.cjs');
 
+const MOBILE_ALLOWED_TABS_SOURCE = mobile.match(/const MOBILE_ALLOWED_TABS = new Set\(\[[^\]]*\]\)/)?.[0] || '';
+
 test('every top-level directory the shells reference is staged by the iPhone site build', () => {
     // The build validates that sources exist, not that references resolve, so a
     // shell can silently ship with a dangling ./vendor or ./css reference.
@@ -92,11 +94,33 @@ test('the viewport scale is pinned so iOS cannot zoom the shell', () => {
 
 test('iOS is told to tap the embed rather than shown a stalling connect message', () => {
     // iOS blocks playVideo() from script, so the generic "connecting" copy just
-    // stalls for 12s before failing. Both the status line and the timeout
-    // warning must name the real action on iOS.
-    assert.match(mobile, /isConnecting\) status\.textContent = isIOSWebKitRuntime\(\)/);
-    assert.match(mobile, /Tap the play button on the video below to begin/);
-    assert.match(mobile, /iOS will not let NexPlay start it for you/);
+    // stalls before failing. Both the status line and the timeout warning must
+    // name the real action, and only until a tap has unlocked the frame.
+    assert.match(mobile, /isConnecting\) status\.textContent = \(isIOSWebKitRuntime\(\) && !onlineMusicEmbedGestureUnlocked\)/);
+    assert.match(mobile, /Tap play on the video once/);
+    assert.match(mobile, /iOS only lets the video itself start the first stream/);
+    assert.match(mobile, /const blockedHint = \(isIOSWebKitRuntime\(\) && !onlineMusicEmbedGestureUnlocked\)/);
+});
+
+test('the YouTube embed is never re-parented and stays reachable off the Online tab', () => {
+    // Moving an iframe in the DOM discards its browsing context, which drops the
+    // YT player object and the iOS in-frame gesture that permits playback.
+    assert.doesNotMatch(mobile, /anchor\.appendChild\(shell\)/);
+    assert.match(mobile, /function positionOnlineMusicPlayerShell\(\)/);
+    assert.match(mobile, /id="online-music-ios-dock"/);
+    assert.match(mobile, /function shouldShowOnlineMusicIOSDock\(current\)/);
+    // A tap inside the frame unlocks script-driven playback for the rest of the session.
+    assert.match(mobile, /onlineMusicEmbedGestureUnlocked = true;/);
+});
+
+test('the mobile library exposes playlists instead of bouncing back to All', () => {
+    assert.match(mobile, /\{ id: 'playlists', label: 'Playlists' \}/);
+    assert.ok(MOBILE_ALLOWED_TABS_SOURCE.includes("'playlists'"), 'playlists must be an allowed mobile tab');
+    assert.doesNotMatch(
+        mobile,
+        /mobile-beginner'\) && state\.activeTab === 'playlists'/,
+        'beginner mode must not silently rewrite the playlists tab to all'
+    );
 });
 
 test('iPhone shell suppresses the WKWebView touch tells', () => {
