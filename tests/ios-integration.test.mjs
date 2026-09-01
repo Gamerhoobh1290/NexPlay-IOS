@@ -169,6 +169,17 @@ test('a screen wake lock can keep an online stream alive until the sleep timer',
     assert.match(timerBody, /syncScreenWakeLock\(\);/);
 });
 
+test('pausing stops the fallback embed instead of only claiming to', () => {
+    // The fallback embed has no scripted transport, so the pauseVideo guard never
+    // passes for it. Unloading the frame is the only thing that stops its audio,
+    // and the sleep timer depends on that actually happening.
+    assert.match(mobile, /function stopOnlineMusicFallbackEmbed\(\)/);
+    assert.match(mobile, /frame\.setAttribute\('src', 'about:blank'\)/);
+    const pause = mobile.slice(mobile.indexOf('function pauseActivePlaybackTransport('));
+    const body = pause.slice(0, pause.indexOf('function seekLocalPlaybackTo('));
+    assert.match(body, /stopOnlineMusicFallbackEmbed\(\);/);
+});
+
 test('the mobile library exposes playlists instead of bouncing back to All', () => {
     assert.match(mobile, /\{ id: 'playlists', label: 'Playlists' \}/);
     assert.ok(MOBILE_ALLOWED_TABS_SOURCE.includes("'playlists'"), 'playlists must be an allowed mobile tab');

@@ -9798,6 +9798,21 @@ isQueueOverlayOpen: false
             return true;
         }
 
+        // The fallback embed exposes no transport, so unloading it is the only way to
+        // stop its audio. Losing the position beats a pause that silently does nothing
+        // and leaves the track playing after the sleep timer says it stopped.
+        function stopOnlineMusicFallbackEmbed() {
+            if (!onlineMusicFallbackEmbedActive) return false;
+            const frame = document.getElementById('online-music-fallback-frame');
+            if (frame) frame.setAttribute('src', 'about:blank');
+            const host = document.getElementById('online-music-yt-player');
+            if (host) host.style.display = '';
+            onlineMusicFallbackEmbedActive = false;
+            onlineMusicEmbedDockDismissed = true;
+            setOnlineMusicEngineStage('fallback-stopped', 'embed unloaded');
+            return true;
+        }
+
         // The YouTube embed never moves in the DOM: re-parenting an iframe discards
         // its browsing context, so the YT player object goes stale and iOS loses the
         // in-frame user gesture that permits playback. It stays a body child and is
@@ -20823,6 +20838,9 @@ isQueueOverlayOpen: false
                         onlineMusicPlayer.pauseVideo();
                     } catch (_) {}
                 }
+                // On the fallback embed that guard never passes, so without this the
+                // audio kept playing while every flag below claimed it had stopped.
+                stopOnlineMusicFallbackEmbed();
                 online.connectingTrackId = null;
                 online.isPlaying = false;
                 state.isPlaying = false;
