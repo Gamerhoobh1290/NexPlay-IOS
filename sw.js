@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexplay-shell-v10';
+const CACHE_NAME = 'nexplay-shell-v11';
 const CORE_ASSETS = [
     './',
     './index.html',
@@ -101,6 +101,11 @@ self.addEventListener('fetch', (event) => {
     const isSameOrigin = requestUrl.origin === self.location.origin;
     const isNavigation = request.mode === 'navigate';
 
+    // Cross-origin requests are left to the browser. Proxying them bought nothing
+    // (their responses were never cached) and it put the YouTube iframe API behind
+    // the worker, which a Home Screen launch always controls from the first byte.
+    if (!isSameOrigin) return;
+
     if (isNavigation) {
         event.respondWith(
             fetch(request)
@@ -128,10 +133,6 @@ self.addEventListener('fetch', (event) => {
     }
 
     event.respondWith(
-        caches.match(request).then((cached) => (
-            isSameOrigin
-                ? networkFirst(request, cached)
-                : fetch(request).catch(() => cached || new Response('', { status: 504, statusText: 'Offline' }))
-        ))
+        caches.match(request).then((cached) => networkFirst(request, cached))
     );
 });

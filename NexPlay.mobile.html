@@ -1402,7 +1402,7 @@
             background: #000;
             transition: opacity 0.24s ease;
         }
-        #online-music-ios-dock {
+        #online-music-embed-dock {
             position: fixed;
             left: 0.65rem;
             right: 0.65rem;
@@ -1419,14 +1419,14 @@
             -webkit-backdrop-filter: blur(18px);
             animation: nexplay-dock-rise 0.28s cubic-bezier(0.22, 1, 0.36, 1);
         }
-        #online-music-ios-dock .online-music-ios-dock-head {
+        #online-music-embed-dock .online-music-embed-dock-head {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 0.6rem;
             margin-bottom: 0.55rem;
         }
-        #online-music-ios-dock .online-music-ios-dock-hint {
+        #online-music-embed-dock .online-music-embed-dock-hint {
             min-width: 0;
             font-size: 0.68rem;
             font-weight: 800;
@@ -2910,6 +2910,7 @@
                                         <div id="online-music-current-title" class="mt-2 truncate text-sm font-black text-white">No track selected</div>
                                         <button id="online-music-current-artist" type="button" class="mt-1 truncate text-left text-xs font-mono text-cyan-200 transition hover:text-white disabled:cursor-default disabled:text-gray-500" disabled>Search YouTube and press play.</button>
                                         <p id="online-music-current-status" class="mt-2 text-xs leading-5 text-gray-400">The bottom NexPlay player handles playback, progress, shuffle, repeat, and volume.</p>
+                                        <p id="online-music-engine-stage" class="mt-2 font-mono text-[10px] leading-4 text-gray-600">engine: idle</p>
                                         <div id="online-music-player-inline-anchor" class="online-music-player-anchor hidden"></div>
                                     </div>
                                     <div class="rounded-xl border border-white/10 bg-black/25 p-3 space-y-2">
@@ -3518,10 +3519,10 @@
     <div id="online-music-player-shell" class="online-music-player-hidden" aria-hidden="true">
         <div id="online-music-yt-player"></div>
     </div>
-    <div id="online-music-ios-dock" class="hidden" aria-hidden="true">
-        <div class="online-music-ios-dock-head">
-            <div class="online-music-ios-dock-hint" id="online-music-ios-dock-hint">Tap play to start</div>
-            <button type="button" class="mobile-chip" onclick="dismissOnlineMusicIOSDock()">Hide</button>
+    <div id="online-music-embed-dock" class="hidden" aria-hidden="true">
+        <div class="online-music-embed-dock-head">
+            <div class="online-music-embed-dock-hint" id="online-music-embed-dock-hint">Tap play to start</div>
+            <button type="button" class="mobile-chip" onclick="dismissOnlineMusicEmbedDock()">Hide</button>
         </div>
         <div id="online-music-player-dock-anchor" class="online-music-player-anchor" style="margin-top:0"></div>
     </div>
@@ -3592,6 +3593,7 @@
         const ONLINE_MUSIC_LIBRARY_KEY = 'nexplay_online_music_library_v2';
         const YOUTUBE_EMBED_HOST = 'https://www.youtube.com';
         const ONLINE_MUSIC_EMBED_MIN_VIEWPORT_PX = 220;
+        const ONLINE_MUSIC_PLAYER_READY_TIMEOUT_MS = 8000;
         const ONLINE_BACKGROUND_PLAYBACK_NOTE = isIOSNativeRuntime()
             ? 'The iPhone app connects playback to the lock screen and Control Center. YouTube-backed streams can still be interrupted by provider or network restrictions.'
             : 'Online streams use your browser media engine. Installed web apps usually behave best, but some phones may still stop YouTube-backed audio on the lock screen.';
@@ -4289,7 +4291,12 @@ isQueueOverlayOpen: false
             // Once a tap inside the YouTube frame has started a video the frame keeps
             // that permission, so later tracks can be started programmatically.
             let onlineMusicEmbedGestureUnlocked = false;
-            let onlineMusicIOSDockDismissed = false;
+            let onlineMusicEmbedDockDismissed = false;
+            let onlineMusicFallbackEmbedActive = false;
+            // Playback engine progress, surfaced in the Online tab. An iPhone Home
+            // Screen app has no Web Inspector, so this line is the only way to see
+            // which step stalled.
+            let onlineMusicEngineStage = 'idle';
             const onlineMusicFailedTrackCache = new Map();
             const activeSeekSliderIds = new Set();
             let onlineMusicPlaybackAttemptSeq = 0;
@@ -7453,6 +7460,9 @@ isQueueOverlayOpen: false
 
         function prewarmOnlineMusicPlayer() {
             if (!getSafeAppOrigin()) return;
+            // An embed built with no video id is a dead black frame, and on some iOS
+            // runtimes it never reports ready. Wait until there is something to load.
+            if (!sanitizeText(getOnlineMusicCurrentTrack()?.videoId || '')) return;
             if (onlineMusicPlayer && typeof onlineMusicPlayer.loadVideoById === 'function') return;
             if (onlineMusicPrewarmRequested && (window.__nexplayOnlineMusicPlayerInitPromise || onlineMusicApiReadyPromise)) return;
             onlineMusicPrewarmRequested = true;
@@ -9750,6 +9760,39 @@ isQueueOverlayOpen: false
             removeFromPlaylist(playlistId, trackId);
         }
 
+        function setOnlineMusicEngineStage(stage, detail = '') {
+            onlineMusicEngineStage = sanitizeText(stage || '') || 'idle';
+            const label = sanitizeText(detail || '');
+            const el = document.getElementById('online-music-engine-stage');
+            if (el) el.textContent = `engine: ${onlineMusicEngineStage}${label ? ` · ${label}` : ''}`;
+        }
+
+        // Last resort when the iframe API never reports ready: a plain embed the
+        // listener can tap. It gives up scripted transport (no progress, no queue
+        // advance) but it needs neither the API script nor an onReady handshake.
+        function mountOnlineMusicFallbackEmbed(track) {
+            const shell = document.getElementById('online-music-player-shell');
+            const videoId = sanitizeText(track?.videoId || '');
+            if (!shell || !videoId) return false;
+            const host = document.getElementById('online-music-yt-player');
+            if (host) host.style.display = 'none';
+            let frame = document.getElementById('online-music-fallback-frame');
+            if (!frame) {
+                frame = document.createElement('iframe');
+                frame.id = 'online-music-fallback-frame';
+                frame.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+                frame.allowFullscreen = true;
+                frame.referrerPolicy = 'origin';
+                frame.title = 'YouTube player';
+                shell.appendChild(frame);
+            }
+            const src = buildYouTubeEmbedUrl(videoId);
+            if (frame.getAttribute('src') !== src) frame.setAttribute('src', src);
+            onlineMusicFallbackEmbedActive = true;
+            setOnlineMusicEngineStage('fallback', 'tap the embed to play');
+            return true;
+        }
+
         // The YouTube embed never moves in the DOM: re-parenting an iframe discards
         // its browsing context, so the YT player object goes stale and iOS loses the
         // in-frame user gesture that permits playback. It stays a body child and is
@@ -9790,16 +9833,17 @@ isQueueOverlayOpen: false
             onlineMusicShellTrackingFrame = requestAnimationFrame(step);
         }
 
-        function shouldShowOnlineMusicIOSDock(current) {
-            return !!current
-                && isIOSWebKitRuntime()
-                && document.body.classList.contains('mobile-runtime')
-                && !onlineMusicEmbedGestureUnlocked
-                && !onlineMusicIOSDockDismissed;
+        function shouldShowOnlineMusicEmbedDock(current) {
+            if (!current || !document.body.classList.contains('mobile-runtime')) return false;
+            if (onlineMusicEmbedDockDismissed) return false;
+            // With the fallback embed there is no scripted transport at all, so the
+            // frame has to be reachable in every runtime, not just on iOS.
+            if (onlineMusicFallbackEmbedActive) return true;
+            return isIOSWebKitRuntime() && !onlineMusicEmbedGestureUnlocked;
         }
 
-        function dismissOnlineMusicIOSDock() {
-            onlineMusicIOSDockDismissed = true;
+        function dismissOnlineMusicEmbedDock() {
+            onlineMusicEmbedDockDismissed = true;
             syncOnlineMusicPlayerSurface();
         }
 
@@ -9807,7 +9851,7 @@ isQueueOverlayOpen: false
             const shell = document.getElementById('online-music-player-shell');
             if (!shell) return;
             const inlineAnchor = document.getElementById('online-music-player-inline-anchor');
-            const dock = document.getElementById('online-music-ios-dock');
+            const dock = document.getElementById('online-music-embed-dock');
             const dockAnchor = document.getElementById('online-music-player-dock-anchor');
             const isMobile = document.body.classList.contains('mobile-runtime');
             const showInline = !options.forceHidden
@@ -9822,7 +9866,7 @@ isQueueOverlayOpen: false
                 && !showInline
                 && !!dock
                 && !!dockAnchor
-                && shouldShowOnlineMusicIOSDock(current);
+                && shouldShowOnlineMusicEmbedDock(current);
             const activeAnchor = showInline ? inlineAnchor : (showDock ? dockAnchor : null);
 
             if (inlineAnchor) inlineAnchor.classList.toggle('hidden', !showInline);
@@ -9831,7 +9875,7 @@ isQueueOverlayOpen: false
                 dock.setAttribute('aria-hidden', showDock ? 'false' : 'true');
             }
             if (showDock) {
-                const hint = document.getElementById('online-music-ios-dock-hint');
+                const hint = document.getElementById('online-music-embed-dock-hint');
                 if (hint) hint.textContent = `Tap play to start "${current.title || 'this track'}"`;
             }
 
@@ -10010,6 +10054,7 @@ isQueueOverlayOpen: false
                 updatePlayIcons();
                 syncOnlineMusicPlayerCard();
                 persistOnlineMusicState();
+                setOnlineMusicEngineStage('stalled', 'no playback signal from the embed');
                 const blockedHint = (isIOSWebKitRuntime() && !onlineMusicEmbedGestureUnlocked)
                     ? 'Tap play on the video NexPlay just opened — iOS only lets the video itself start the first stream.'
                     : 'Tap Play again if your browser blocked automatic start.';
@@ -10055,6 +10100,7 @@ isQueueOverlayOpen: false
                 150: 'This YouTube video does not allow embedded playback.'
             };
             const failure = rememberFailedOnlineMusicTrack(current, messages[code] || 'Hidden YouTube playback failed for this track.');
+            setOnlineMusicEngineStage('embed-error', `code ${code}`);
             rememberOnlineMusicPlaybackResolverState('error', failure.message);
             updatePlayIcons();
             syncOnlineMusicPlayerCard();
@@ -10085,6 +10131,7 @@ isQueueOverlayOpen: false
                 // The frame has now played under a real gesture, so NexPlay may drive
                 // it from script for the rest of this page's life.
                 onlineMusicEmbedGestureUnlocked = true;
+                setOnlineMusicEngineStage('playing');
                 clearOnlineMusicConnectTimeout();
                 stopLocalMediaTransport();
                 state.currentPlaybackSource = 'online-music';
@@ -10162,6 +10209,7 @@ isQueueOverlayOpen: false
                 return Promise.resolve(window.YT);
             }
             if (onlineMusicApiReadyPromise) return onlineMusicApiReadyPromise;
+            setOnlineMusicEngineStage('api', 'loading iframe API');
             onlineMusicApiReadyPromise = new Promise((resolve, reject) => {
                 onlineMusicApiReadyResolve = resolve;
                 onlineMusicApiReadyReject = reject;
@@ -10190,6 +10238,7 @@ isQueueOverlayOpen: false
                 if (settled) return;
                 settled = true;
                 if (typeof previous === 'function') previous();
+                setOnlineMusicEngineStage('api-ready', 'iframe API loaded');
                 const resolve = onlineMusicApiReadyResolve;
                 onlineMusicApiReadyResolve = null;
                 onlineMusicApiReadyReject = null;
@@ -10245,7 +10294,26 @@ isQueueOverlayOpen: false
             window.__nexplayOnlineMusicPlayerInitPromise = loadYouTubeIframeApi()
                 .then(() => new Promise((resolve) => {
                     onlineMusicPlayerReady = false;
+                    setOnlineMusicEngineStage('player', 'constructing embed');
+                    // onReady is the only thing that settles this promise, and it never
+                    // arrives if the embed cannot complete its handshake. Bound the wait
+                    // so callers fail over instead of hanging on "Connecting..." forever.
+                    let settled = false;
+                    const settle = (value) => {
+                        if (settled) return;
+                        settled = true;
+                        window.clearTimeout(readyTimeoutId);
+                        resolve(value);
+                    };
+                    const readyTimeoutId = window.setTimeout(() => {
+                        setOnlineMusicEngineStage('player-timeout', 'embed never reported ready');
+                        window.__nexplayOnlineMusicPlayerInitPromise = null;
+                        onlineMusicPlayerReady = false;
+                        onlineMusicPrewarmRequested = false;
+                        settle(null);
+                    }, ONLINE_MUSIC_PLAYER_READY_TIMEOUT_MS);
                     let host = document.getElementById('online-music-yt-player');
+                    if (host) host.style.display = '';
                     if (!host) {
                         const shell = document.getElementById('online-music-player-shell');
                         if (shell) {
@@ -10256,7 +10324,7 @@ isQueueOverlayOpen: false
                     }
                     if (!host) {
                         window.__nexplayOnlineMusicPlayerInitPromise = null;
-                        return resolve(null);
+                        return settle(null);
                     }
                     const playerVars = {
                         autoplay: 0,
@@ -10284,11 +10352,12 @@ isQueueOverlayOpen: false
                                 onReady: () => {
                                     onlineMusicPlayerReady = true;
                                     onlineMusicPrewarmRequested = true;
+                                    setOnlineMusicEngineStage('ready', 'embed accepted commands');
                                     try {
                                         onlineMusicPlayer.setVolume(clampNumber(getOnlineMusicState().volume, 0, 100, 70));
                                     } catch (_) {}
                                     syncOnlineMusicPlayerCard();
-                                    resolve(onlineMusicPlayer);
+                                    settle(onlineMusicPlayer);
                                 },
                                 onStateChange: (event) => {
                                     if (!onlineMusicPlayerReady && event?.data !== window.YT?.PlayerState?.UNSTARTED) {
@@ -10300,8 +10369,9 @@ isQueueOverlayOpen: false
                             }
                         });
                     } catch (_) {
+                        setOnlineMusicEngineStage('player-error', 'embed could not be constructed');
                         window.__nexplayOnlineMusicPlayerInitPromise = null;
-                        resolve(null);
+                        settle(null);
                     }
                 }))
                 .catch((error) => {
@@ -10309,6 +10379,7 @@ isQueueOverlayOpen: false
                     onlineMusicPlayerReady = false;
                     window.__nexplayOnlineMusicPlayerInitPromise = null;
                     const message = error?.message || 'YouTube playback service could not load.';
+                    setOnlineMusicEngineStage('api-error', message);
                     updateOnlineMusicFeedback(message, 'error');
                     showToast(message, 'error');
                     return null;
@@ -10524,7 +10595,7 @@ isQueueOverlayOpen: false
             state.currentTrack = libraryTrack ? { ...libraryTrack } : { ...resolved, resumePosition: 0, resumeUpdatedAt: 0 };
             online.currentTrack = { ...(libraryTrack || resolved), resumePosition: 0, resumeUpdatedAt: 0 };
             online.connectingTrackId = shouldAutoplay ? resolved.id : null;
-            if (shouldAutoplay) onlineMusicIOSDockDismissed = false;
+            if (shouldAutoplay) onlineMusicEmbedDockDismissed = false;
             online.currentTime = Math.max(0, Number(options.startTime) || 0);
             online.duration = Math.max(0, Number(libraryTrack?.duration || resolved.duration) || 0);
             applyNowPlayingMetadata(libraryTrack || resolved);
@@ -10543,6 +10614,9 @@ isQueueOverlayOpen: false
             if (shouldAutoplay) {
                 updateOnlineMusicFeedback(`Connecting "${resolved.title}"...`, 'info');
             }
+            // Armed before the await: the player promise itself can stall, and until
+            // this timer exists nothing can clear a stuck "Connecting..." state.
+            if (shouldAutoplay) scheduleOnlineMusicConnectTimeout(resolved.id, sessionId);
             const playerPromise = ensureOnlineMusicPlayer(resolved.videoId);
             stopLocalMediaTransport();
             let player = null;
@@ -10574,12 +10648,29 @@ isQueueOverlayOpen: false
                 return true;
             }
             if (!player || typeof player.loadVideoById !== 'function') {
+                clearOnlineMusicConnectTimeout();
+                online.connectingTrackId = null;
+                online.isPlaying = false;
+                state.isPlaying = false;
+                stopOnlineMusicProgressTimer();
+                updatePlayIcons();
+                // The scripted player is unusable here, but a plain embed still is:
+                // it needs no iframe API and no onReady handshake, only a tap.
+                if (mountOnlineMusicFallbackEmbed(resolved)) {
+                    syncOnlineMusicPlayerCard();
+                    scrollOnlineMusicPlayerSurfaceIntoView();
+                    persistOnlineMusicState();
+                    updateOnlineMusicFeedback(
+                        `NexPlay could not drive the YouTube player here, so it opened "${resolved.title}" as a video you can tap. Playback works; progress and automatic queue advance do not.`,
+                        'warn'
+                    );
+                    return true;
+                }
                 deactivateOnlineMusicTransport({
                     nextPlaybackSource: 'local',
                     stopPlayer: false,
                     resetTime: false
                 });
-                online.connectingTrackId = null;
                 syncOnlineMusicPlayerCard();
                 updateOnlineMusicFeedback('Online player could not initialize.', 'error');
                 persistOnlineMusicState();
@@ -10594,6 +10685,7 @@ isQueueOverlayOpen: false
                 online.isPlaying = false;
                 state.isPlaying = false;
             } else {
+                setOnlineMusicEngineStage('loading', `requested "${resolved.title}"`);
                 player.loadVideoById({ videoId: resolved.videoId, startSeconds });
                 scheduleOnlineMusicConnectTimeout(resolved.id, sessionId);
             }

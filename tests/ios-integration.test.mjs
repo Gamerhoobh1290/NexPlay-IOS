@@ -107,10 +107,43 @@ test('the YouTube embed is never re-parented and stays reachable off the Online 
     // YT player object and the iOS in-frame gesture that permits playback.
     assert.doesNotMatch(mobile, /anchor\.appendChild\(shell\)/);
     assert.match(mobile, /function positionOnlineMusicPlayerShell\(\)/);
-    assert.match(mobile, /id="online-music-ios-dock"/);
-    assert.match(mobile, /function shouldShowOnlineMusicIOSDock\(current\)/);
+    assert.match(mobile, /id="online-music-embed-dock"/);
+    assert.match(mobile, /function shouldShowOnlineMusicEmbedDock\(current\)/);
     // A tap inside the frame unlocks script-driven playback for the rest of the session.
     assert.match(mobile, /onlineMusicEmbedGestureUnlocked = true;/);
+});
+
+test('online playback cannot hang forever waiting on the YouTube embed', () => {
+    // onReady is the only thing that settles the player promise. A Home Screen web
+    // app where it never arrives used to sit on "Connecting..." indefinitely, because
+    // the connect timeout was armed only after that await.
+    assert.match(mobile, /const ONLINE_MUSIC_PLAYER_READY_TIMEOUT_MS = \d+;/);
+    assert.match(mobile, /}, ONLINE_MUSIC_PLAYER_READY_TIMEOUT_MS\);/);
+    const play = mobile.slice(mobile.indexOf('async function playOnlineMusicTrack('));
+    const armIndex = play.indexOf('scheduleOnlineMusicConnectTimeout(resolved.id, sessionId)');
+    const awaitIndex = play.indexOf('await playerPromise');
+    assert.ok(armIndex > -1 && awaitIndex > -1, 'both the stall guard and the await must exist');
+    assert.ok(armIndex < awaitIndex, 'the stall guard must be armed before the player await');
+});
+
+test('a dead scripted player falls back to a tappable embed', () => {
+    // The plain embed needs neither the iframe API nor an onReady handshake, so it
+    // still plays where the scripted player cannot be driven at all.
+    assert.match(mobile, /function mountOnlineMusicFallbackEmbed\(track\)/);
+    assert.match(mobile, /id="online-music-fallback-frame"|frame\.id = 'online-music-fallback-frame'/);
+    assert.match(mobile, /if \(onlineMusicFallbackEmbedActive\) return true;/);
+    // No inspector exists on a Home Screen app, so the engine stage is the only readout.
+    assert.match(mobile, /id="online-music-engine-stage"/);
+    assert.match(mobile, /function setOnlineMusicEngineStage\(stage, detail = ''\)/);
+});
+
+test('the bundled worker leaves cross-origin requests to the browser', () => {
+    // This is the worker the iOS bundle and the local iPhone server ship; the Netlify
+    // build generates its own, which already bypasses YouTube. Keep the two agreed so
+    // the iframe API is never served from a cache on either path.
+    const worker = read('sw.js');
+    assert.match(worker, /if \(!isSameOrigin\) return;/);
+    assert.doesNotMatch(worker, /isSameOrigin\s*\?\s*networkFirst/);
 });
 
 test('the mobile library exposes playlists instead of bouncing back to All', () => {
