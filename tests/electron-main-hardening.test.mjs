@@ -121,6 +121,26 @@ function invokeRequest(requestHandler, url) {
   return response;
 }
 
+test('local server refuses requests addressed to a foreign host name', () => {
+  const { api } = loadElectronMain();
+  const request = (host) => {
+    const response = {
+      statusCode: null,
+      writeHead(statusCode) { this.statusCode = statusCode; },
+      end() {}
+    };
+    api.requestHandler({ method: 'GET', url: '/__nexplay_online_stream__/missing', headers: { host } }, response);
+    return response.statusCode;
+  };
+  // A DNS-rebinding page reaches 127.0.0.1 but still sends its own host name.
+  assert.equal(request('attacker.example:5000'), 403);
+  assert.equal(request('localhost.attacker.example:5000'), 403);
+  assert.equal(request('localhost:5001'), 403);
+  for (const host of ['localhost:5000', 'LOCALHOST:5000', '127.0.0.1:5000', '[::1]:5000']) {
+    assert.equal(request(host), 404, host);
+  }
+});
+
 test('local HTTP routes return 400 for malformed percent encoding', () => {
   const { api } = loadElectronMain();
   const malformedUrls = [

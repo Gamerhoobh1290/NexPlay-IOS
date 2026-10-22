@@ -408,7 +408,20 @@ function pipeOnlineAudioStream(req, res, token, redirectCount = 0) {
   upstream.end();
 }
 
+function isAllowedRequestHost(hostHeader) {
+  // Browsers always send Host; a DNS-rebinding page sends its own name.
+  if (hostHeader === undefined) return true;
+  const port = String(localPort || FIXED_PORT);
+  const host = String(hostHeader).trim().toLowerCase();
+  return [`${HOST}:${port}`, `127.0.0.1:${port}`, `[::1]:${port}`].includes(host);
+}
+
 function requestHandler(req, res) {
+  if (!isAllowedRequestHost(req.headers?.host)) {
+    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Forbidden');
+    return;
+  }
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('Method Not Allowed');
