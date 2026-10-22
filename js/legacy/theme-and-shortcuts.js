@@ -472,7 +472,7 @@ function renderCoverWallModule() {
         lastCoverWallStorePersist = Date.now();
     }
     const cards = picks.map((track) => {
-        const img = track.cover ? `<img src="${track.cover}" loading="lazy" decoding="async" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-gray-600"><i data-lucide="${track.type === 'video' ? 'video' : 'music'}" class="w-5 h-5"></i></div>`;
+        const img = track.cover ? `<img src="${escapeHtml(track.cover)}" loading="lazy" decoding="async" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-gray-600"><i data-lucide="${track.type === 'video' ? 'video' : 'music'}" class="w-5 h-5"></i></div>`;
         return `<button onclick="loadTrack('${track.id}', true)" class="aspect-square rounded-lg overflow-hidden border border-white/10 bg-black/40 hover:scale-[1.03] transition">${img}</button>`;
     }).join('');
     return `<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">${cards}</div>`;

@@ -1101,7 +1101,7 @@ function renderQueueOverlay() {
         const row = document.createElement('div');
         row.className = 'queue-item flex items-center gap-3 py-2 px-2 border-b border-white/10 last:border-b-0';
         row.innerHTML = `
-            <img src="${track.cover || ''}" class="w-8 h-8 rounded-md object-cover ${track.cover ? '' : 'hidden'}">
+            <img src="${escapeHtml(track.cover || '')}" class="w-8 h-8 rounded-md object-cover ${track.cover ? '' : 'hidden'}">
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 min-w-0">
                     <div class="text-sm font-medium text-white truncate">${track.title}</div>

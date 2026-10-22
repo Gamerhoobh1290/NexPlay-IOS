@@ -221,7 +221,7 @@ function renderTracks(opts = {}) {
                 <div class="flex items-center flex-1 min-w-0 gap-4">
 	                            <div class="w-5 h-5 flex items-center justify-center shrink-0"><input type="checkbox" data-select-checkbox="true" data-action="toggle-select" data-track-id="${track.id}" ${isSelected ? 'checked' : ''} class="multi-select-only w-4 h-4 accent-cyan-500 rounded-md border border-white/20"></div>
                     <div class="w-12 h-12 shrink-0 relative rounded-lg overflow-hidden bg-[#1a1d26] ring-1 ring-white/5">
-                        <img id="img-list-${track.id}" src="${coverSrc}" loading="${artworkLoading}" decoding="async" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="${track.type === 'video' ? 'video' : 'audio'}" class="w-full h-full object-cover ${hasCover?'':'hidden'}">
+                        <img id="img-list-${track.id}" src="${escapeHtml(coverSrc)}" loading="${artworkLoading}" decoding="async" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="${track.type === 'video' ? 'video' : 'audio'}" class="w-full h-full object-cover ${hasCover?'':'hidden'}">
                         <div class="default-icon w-full h-full flex items-center justify-center ${hasCover?'hidden':''}">
                             <i data-lucide="${track.type === 'video' ? 'video' : 'music'}" class="text-gray-600 w-5 h-5"></i>
                         </div>
@@ -253,7 +253,7 @@ function renderTracks(opts = {}) {
                     <i data-lucide="circle" class="w-4 h-4 mx-auto select-icon-circle ${isSelected ? 'hidden' : ''}"></i>
                 </button>
             <div class="relative overflow-hidden rounded-xl aspect-square w-full mb-4 bg-black/50 shadow-inner">
-                <img id="img-grid-${track.id}" src="${coverSrc}" loading="${artworkLoading}" decoding="async" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="${track.type === 'video' ? 'video' : 'audio'}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 ${hasCover?'':'hidden'}">
+                <img id="img-grid-${track.id}" src="${escapeHtml(coverSrc)}" loading="${artworkLoading}" decoding="async" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="${track.type === 'video' ? 'video' : 'audio'}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 ${hasCover?'':'hidden'}">
                 <div class="default-icon w-full h-full flex items-center justify-center ${hasCover?'hidden':''}">
                     <i data-lucide="${track.type === 'video' ? 'video' : 'music'}" class="text-gray-700 w-10 h-10"></i>
                 </div>
@@ -1461,7 +1461,7 @@ function renderMusicGameCardArtwork(gameId = '') {
             const left = 4 + (index * 28);
             const rotate = -7 + (index * 6);
             return `<div class="music-games-card-cover" style="top:${top}px; left:${left}px; transform: rotate(${rotate}deg);">
-                <img src="${cover}" alt="${escapeHtml(track.title || 'Album cover')}" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="audio">
+                <img src="${escapeHtml(cover)}" alt="${escapeHtml(track.title || 'Album cover')}" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="audio">
             </div>`;
         }).join('')}
     </div>`;
@@ -1582,10 +1582,10 @@ function renderMusicGameSnakeRuntime(snake = getMusicGamesState().snake) {
                 const segment = snake.snake[segmentIndex] || { x, y };
                 const cover = segmentIndex > 0 ? snake.collectedCovers[segmentIndex - 1] || '' : '';
                 const styleParts = getMusicGameSnakeSegmentMotionStyle(segment, motionFrom[segmentIndex]);
-                if (cover) styleParts.push(`background-image:url('${cover}')`);
-                inner = `<div class="music-games-snake-segment ${segmentIndex === 0 ? 'music-games-snake-head' : ''}" style="${styleParts.join(';')}"></div>`;
+                if (cover) styleParts.push(`background-image:url(${JSON.stringify(cover)})`);
+                inner = `<div class="music-games-snake-segment ${segmentIndex === 0 ? 'music-games-snake-head' : ''}" style="${escapeHtml(styleParts.join(';'))}"></div>`;
             } else if (isFood) {
-                    inner = `<div class="music-games-food"><img src="${snake.food.cover}" alt="${escapeHtml(snake.food.title || 'Album cover')}" class="h-full w-full object-cover"></div>`;
+                    inner = `<div class="music-games-food"><img src="${escapeHtml(snake.food.cover)}" alt="${escapeHtml(snake.food.title || 'Album cover')}" class="h-full w-full object-cover"></div>`;
             } else if (isHazard) {
                 inner = '<div class="music-games-snake-hazard"></div>';
             }
@@ -1597,7 +1597,7 @@ function renderMusicGameSnakeRuntime(snake = getMusicGamesState().snake) {
     const primaryLabel = snake.running ? 'Pause' : (snake.gameOver ? 'Play Again' : 'Resume');
     const mobileLabel = snake.running ? 'Pause' : (snake.gameOver ? 'Again' : 'Play');
     const pickupMarkup = snake.food ? `<div class="mt-3 flex items-center gap-3">
-                            <div class="h-14 w-14 overflow-hidden rounded-xl border border-white/10 bg-black/40"><img src="${snake.food.cover}" alt="${escapeHtml(snake.food.title || 'Cover')}" class="h-full w-full object-cover"></div>
+                            <div class="h-14 w-14 overflow-hidden rounded-xl border border-white/10 bg-black/40"><img src="${escapeHtml(snake.food.cover)}" alt="${escapeHtml(snake.food.title || 'Cover')}" class="h-full w-full object-cover"></div>
                             <div class="min-w-0">
                                 <div class="truncate text-sm font-black text-white">${escapeHtml(snake.food.title || 'Album art')}</div>
                             <div class="mt-1 text-xs text-gray-400">Collect to extend your chain and keep the run alive.</div>
@@ -1727,7 +1727,7 @@ function renderMusicGameSongRaceRuntime(race = getMusicGamesState().songRace) {
                             </div>
                             <div class="mt-3 flex flex-col items-center text-center">
                                 <div class="h-12 w-12 overflow-hidden rounded-xl border border-white/10 bg-black/40">
-                                    <img src="${lane.cover}" alt="${escapeHtml(lane.title || 'Runner cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${lane.trackId}" data-track-title="${escapeHtml(lane.title || '')}" data-track-artist="${escapeHtml(lane.artist || '')}" data-track-type="audio">
+                                    <img src="${escapeHtml(lane.cover)}" alt="${escapeHtml(lane.title || 'Runner cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${lane.trackId}" data-track-title="${escapeHtml(lane.title || '')}" data-track-artist="${escapeHtml(lane.artist || '')}" data-track-type="audio">
                                 </div>
                                 <div class="mt-2 min-w-0">
                                     <div class="truncate text-sm font-black text-white">${escapeHtml(lane.title || 'Untitled')}</div>
@@ -1740,7 +1740,7 @@ function renderMusicGameSongRaceRuntime(race = getMusicGamesState().songRace) {
                                     <div class="${racerClass}" style="bottom:${racerBottom.toFixed(2)}%">
                                         <div class="music-games-race-racer-core">
                                             <span class="music-games-race-racer-cover">
-                                                <img src="${lane.cover}" alt="${escapeHtml(lane.title || 'Runner cover')}" loading="lazy">
+                                                <img src="${escapeHtml(lane.cover)}" alt="${escapeHtml(lane.title || 'Runner cover')}" loading="lazy">
                                             </span>
                                             <span class="music-games-race-racer-bars" aria-hidden="true">
                                                 <span class="music-games-race-racer-bar"></span>
@@ -4399,7 +4399,7 @@ function renderPianoTilesSongRow(track = null, selectedTrackId = '') {
     return `<button onclick="selectPianoTilesTrack(${escapeInlineJsArgument(track.id)})" class="music-games-piano-song-row w-full rounded-[1.35rem] border px-3 py-3 text-left ${selected ? 'border-cyan-400/45 bg-cyan-500/10 shadow-[0_0_28px_rgba(6,182,212,0.14)]' : 'border-white/10 bg-black/28 hover:border-white/25 hover:bg-white/5'}">
         <div class="flex min-w-0 items-center gap-3">
             <div class="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40">
-                <img src="${getTrackCoverOrFallback(track)}" alt="${escapeHtml(track.title || 'Track cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="audio">
+                <img src="${escapeHtml(getTrackCoverOrFallback(track))}" alt="${escapeHtml(track.title || 'Track cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="audio">
             </div>
             <div class="min-w-0 flex-1">
                 <div class="truncate text-sm font-black text-white">${escapeHtml(track.title || 'Untitled')}</div>
@@ -4474,7 +4474,7 @@ function renderPianoTilesStartScreen() {
                 ${selectedTrack ? `<div class="mt-5 rounded-[1.55rem] border border-white/10 bg-black/30 p-4">
                     <div class="flex min-w-0 items-center gap-4">
                         <div class="h-20 w-20 shrink-0 overflow-hidden rounded-[1.25rem] border border-white/10 bg-black/40">
-                            <img src="${getTrackCoverOrFallback(selectedTrack)}" alt="${escapeHtml(selectedTrack.title || 'Track cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${selectedTrack.id}" data-track-title="${escapeHtml(selectedTrack.title || '')}" data-track-artist="${escapeHtml(selectedTrack.artist || '')}" data-track-type="audio">
+                            <img src="${escapeHtml(getTrackCoverOrFallback(selectedTrack))}" alt="${escapeHtml(selectedTrack.title || 'Track cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${selectedTrack.id}" data-track-title="${escapeHtml(selectedTrack.title || '')}" data-track-artist="${escapeHtml(selectedTrack.artist || '')}" data-track-type="audio">
                         </div>
                         <div class="min-w-0 flex-1">
                             <div class="truncate text-lg font-black text-white">${escapeHtml(selectedTrack.title || 'Untitled')}</div>
@@ -4543,7 +4543,7 @@ function renderPianoTilesAnalyzingScreen() {
                 <p id="piano-tiles-analysis-status" class="mx-auto mt-3 max-w-xl text-sm leading-7 text-gray-300">${escapeHtml(piano.analysisStatus || 'Preparing audio analysis...')}</p>
                 ${track ? `<div class="mx-auto mt-5 flex max-w-md items-center gap-3 rounded-[1.3rem] border border-white/10 bg-black/30 p-3 text-left">
                     <div class="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40">
-                        <img src="${getTrackCoverOrFallback(track)}" alt="${escapeHtml(track.title || 'Track cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="audio">
+                        <img src="${escapeHtml(getTrackCoverOrFallback(track))}" alt="${escapeHtml(track.title || 'Track cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="audio">
                     </div>
                     <div class="min-w-0">
                         <div class="truncate text-sm font-black text-white">${escapeHtml(track.title || 'Untitled')}</div>
@@ -4579,7 +4579,7 @@ function renderPianoTilesGameplayScreen() {
                 <div class="rounded-[1.8rem] holo-panel border border-white/10 p-5">
                     ${track ? `<div class="flex min-w-0 items-center gap-3">
                         <div class="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40">
-                            <img src="${getTrackCoverOrFallback(track)}" alt="${escapeHtml(track.title || 'Track cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="audio">
+                            <img src="${escapeHtml(getTrackCoverOrFallback(track))}" alt="${escapeHtml(track.title || 'Track cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="audio">
                         </div>
                         <div class="min-w-0">
                             <div class="truncate text-sm font-black text-white">${escapeHtml(track.title || 'Untitled')}</div>
@@ -4754,7 +4754,7 @@ function renderMathUnlockGame() {
                             <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-200">Playback Locked</div>
                             <div class="mt-4 flex items-center gap-4 rounded-[1.25rem] border border-white/10 bg-black/35 px-4 py-4">
                                 <div class="h-16 w-16 overflow-hidden rounded-[1rem] border border-white/10 bg-black/40">
-                                    <img src="${getTrackCoverOrFallback(selectedTrack)}" alt="${escapeHtml(selectedTrack.title || 'Track cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${selectedTrack.id}" data-track-title="${escapeHtml(selectedTrack.title || '')}" data-track-artist="${escapeHtml(selectedTrack.artist || '')}" data-track-type="audio">
+                                    <img src="${escapeHtml(getTrackCoverOrFallback(selectedTrack))}" alt="${escapeHtml(selectedTrack.title || 'Track cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${selectedTrack.id}" data-track-title="${escapeHtml(selectedTrack.title || '')}" data-track-artist="${escapeHtml(selectedTrack.artist || '')}" data-track-type="audio">
                                 </div>
                                 <div class="min-w-0">
                                     <div class="truncate text-base font-black text-white">${escapeHtml(selectedTrack.title || 'Untitled')}</div>
@@ -4854,7 +4854,7 @@ function renderWhosThatArtistGame() {
                     <p class="mt-2 text-sm leading-7 text-gray-400">${escapeHtml(quiz.feedback || 'Listen to the clip and identify the artist.')}</p>
                     ${track ? `<div class="mt-5 flex items-center gap-3 rounded-[1.3rem] border border-white/10 bg-black/35 px-4 py-4">
                         <div class="h-14 w-14 overflow-hidden rounded-xl border border-white/10 bg-black/40">
-                            <img src="${getTrackCoverOrFallback(track)}" alt="${escapeHtml(track.title || 'Track cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="audio">
+                            <img src="${escapeHtml(getTrackCoverOrFallback(track))}" alt="${escapeHtml(track.title || 'Track cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="audio">
                         </div>
                         <div class="min-w-0">
                             <div class="truncate text-sm font-black text-white">${escapeHtml(track.title || 'Unknown song')}</div>
@@ -4918,7 +4918,7 @@ function renderFinishTheLyricsGame() {
                 <div class="text-[10px] font-black uppercase tracking-[0.18em] text-gray-500">Lyric Source</div>
                 ${track ? `<div class="mt-4 flex items-center gap-3 rounded-[1.3rem] border border-white/10 bg-black/30 px-4 py-4">
                     <div class="h-14 w-14 overflow-hidden rounded-xl border border-white/10 bg-black/40">
-                        <img src="${getTrackCoverOrFallback(track)}" alt="${escapeHtml(track.title || 'Track cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="audio">
+                        <img src="${escapeHtml(getTrackCoverOrFallback(track))}" alt="${escapeHtml(track.title || 'Track cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="audio">
                     </div>
                     <div class="min-w-0">
                         <div class="truncate text-sm font-black text-white">${escapeHtml(track.title || 'Untitled')}</div>
@@ -5641,7 +5641,7 @@ function renderMusicGameTrackButton(track = null, options = {}) {
     return `<button onclick="${opts.onclick}" class="w-full rounded-[1.35rem] border px-3 py-3 text-left transition ${opts.highlighted ? 'border-cyan-400/40 bg-cyan-500/10 text-white shadow-[0_0_24px_rgba(6,182,212,0.16)]' : 'border-white/10 bg-black/30 text-gray-200 hover:border-white/25 hover:bg-white/5'} ${opts.muted ? 'opacity-60' : ''}">
         <div class="flex items-center gap-3">
             <div class="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40">
-                <img src="${cover}" alt="${escapeHtml(track.title || 'Track cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="audio">
+                <img src="${escapeHtml(cover)}" alt="${escapeHtml(track.title || 'Track cover')}" class="h-full w-full object-cover" data-track-cover-image="true" data-track-id="${track.id}" data-track-title="${escapeHtml(track.title || '')}" data-track-artist="${escapeHtml(track.artist || '')}" data-track-type="audio">
             </div>
             <div class="min-w-0 flex-1">
                 <div class="truncate text-sm font-bold">${escapeHtml(track.title || 'Untitled')}</div>
