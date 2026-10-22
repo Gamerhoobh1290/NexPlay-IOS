@@ -687,6 +687,8 @@ function isExplicitlyAllowedExternalMediaPath(filePath = '') {
 }
 
 function isAllowedExternalMediaPath(filePath) {
+  // Renderer IPC can add paths and watch roots, so serve media files only.
+  if (!isMediaFilePath(filePath)) return false;
   if (isExplicitlyAllowedExternalMediaPath(filePath)) return true;
   return watchRoots.some((root) => isWithinRoot(filePath, root.path));
 }

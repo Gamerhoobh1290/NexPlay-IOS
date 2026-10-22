@@ -184,6 +184,27 @@ function createYtDlpSpawnRecorder() {
   return { spawnCalls, childProcessMock };
 }
 
+test('external media route refuses non-media files even when a renderer allowlists them', async () => {
+  const { api } = loadElectronMain();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nexplay-media-route-'));
+  try {
+    const secretPath = path.join(dir, 'secret.txt');
+    fs.writeFileSync(secretPath, 'canary');
+    const allowedPath = api.allowExternalMediaPath(secretPath);
+    const response = await new Promise((resolve) => {
+      const res = {
+        statusCode: null,
+        writeHead(statusCode) { this.statusCode = statusCode; },
+        end() { resolve(this); }
+      };
+      api.requestHandler({ method: 'HEAD', url: api.buildExternalMediaUrl(allowedPath), headers: {} }, res);
+    });
+    assert.equal(response.statusCode, 403);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('a renderer-supplied source URL can never be parsed as a yt-dlp option', async () => {
   const injected = '--config-locations=\\attacker\share\yt-dlp.conf';
 
