@@ -970,14 +970,16 @@ async function safePlayMedia(media = null, options = {}) {
         if (!raw) return '';
         return safeCall(() => new URL(raw, window.location?.href || undefined).href, raw);
     };
-    const expectedMediaSource = normalizeMediaSource(opts.expectedMediaSource || media.currentSrc || media.src || '');
+    // media.src reflects the latest assignment at once; currentSrc keeps the
+    // previous track's URL until the asynchronous resource selection runs.
+    const expectedMediaSource = normalizeMediaSource(opts.expectedMediaSource || media.src || media.currentSrc || '');
     const contextIsActive = () => {
         if (opts.playbackIntent && !isPlaybackIntentActive(opts.playbackIntent)) return false;
         const expectedTrackId = sanitizeText(opts.expectedTrackId || '');
         if (expectedTrackId && expectedTrackId !== sanitizeText(state.currentTrackId || '')) return false;
         const expectedPlaybackSource = sanitizeText(opts.expectedPlaybackSource || '');
         if (expectedPlaybackSource && expectedPlaybackSource !== sanitizeText(state.currentPlaybackSource || '')) return false;
-        if (expectedMediaSource && expectedMediaSource !== normalizeMediaSource(media.currentSrc || media.src || '')) return false;
+        if (expectedMediaSource && expectedMediaSource !== normalizeMediaSource(media.src || media.currentSrc || '')) return false;
         return true;
     };
     if (!contextIsActive()) return false;
