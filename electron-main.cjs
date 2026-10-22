@@ -1408,7 +1408,8 @@ async function runYtDlpDownload({ request, outputTemplate, ffmpegLocation, sourc
   if (ffmpegLocation) {
     args.push('--ffmpeg-location', ffmpegLocation);
   }
-  args.push(sourceUrl);
+  // The URL comes from the renderer; '--' stops yt-dlp reading it as an option.
+  args.push('--', sourceUrl);
 
   let lastPhase = '';
   let lastPercent = -1;
@@ -2300,6 +2301,7 @@ async function resolveOnlineTrackAudioStream(rawPayload = {}) {
     '--no-playlist',
     '--dump-single-json',
     '--format', 'bestaudio[ext=m4a]/bestaudio/best',
+    '--',
     sourceUrl
   ], {
     timeoutMs,

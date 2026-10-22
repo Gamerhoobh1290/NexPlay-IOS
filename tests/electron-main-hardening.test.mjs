@@ -21,7 +21,8 @@ function loadElectronMain({
   userDataPath = electronMainDir,
   sessionMock = null,
   appVersion = 'test',
-  packageMetadata = { build: { buildVersion: 'test-build' } }
+  packageMetadata = { build: { buildVersion: 'test-build' } },
+  childProcessMock = null
 } = {}) {
   const appEvents = new Map();
   const calls = {
@@ -73,6 +74,7 @@ function loadElectronMain({
     exports: moduleRecord.exports,
     require(specifier) {
       if (specifier === './package.json') return packageMetadata;
+      if (specifier === 'child_process' && childProcessMock) return childProcessMock;
       return specifier === 'electron' ? electronMock : requireFromElectronMain(specifier);
     },
     __dirname: electronMainDir,
@@ -88,7 +90,7 @@ function loadElectronMain({
     AbortController,
     fetch: fetchImpl
   };
-  const instrumentedSource = `${electronMainSource}\nmodule.exports.__hardeningTestApi = { MIME_TYPES, getDesktopSecurityHeaders, requestHandler, resolveRequestToFile, isWithinRoot, focusExistingWindow, fetchApprovedRemoteJson, migrateDesktopShellCache, allowExternalMediaPath, buildExternalMediaUrl };`;
+  const instrumentedSource = `${electronMainSource}\nmodule.exports.__hardeningTestApi = { MIME_TYPES, getDesktopSecurityHeaders, requestHandler, resolveRequestToFile, isWithinRoot, focusExistingWindow, fetchApprovedRemoteJson, migrateDesktopShellCache, allowExternalMediaPath, buildExternalMediaUrl, runYtDlpDownload, resolveOnlineTrackAudioStream };`;
   vm.runInNewContext(instrumentedSource, sandbox, { filename: electronMainPath });
 
   return {
@@ -152,6 +154,58 @@ test('external media route serves an allowed file whose name contains a percent 
     }
   } finally {
     fs.rmSync(mediaDir, { recursive: true, force: true });
+  }
+});
+
+function createYtDlpSpawnRecorder() {
+  const spawnCalls = [];
+  const childProcessMock = {
+    spawnSync: (command, args) => ({ status: 0, stdout: `C:\fake\${args[0]}.exe
+` }),
+    spawn(command, args) {
+      spawnCalls.push(args);
+      const listeners = {};
+      const child = {
+        stdout: null,
+        stderr: null,
+        once(eventName, handler) {
+          listeners[eventName] = handler;
+          if (eventName === 'spawn') setTimeout(() => handler(), 0);
+          if (eventName === 'close') setTimeout(() => handler(1), 0);
+          return child;
+        },
+        on() { return child; },
+        removeListener() { return child; },
+        kill() {}
+      };
+      return child;
+    }
+  };
+  return { spawnCalls, childProcessMock };
+}
+
+test('a renderer-supplied source URL can never be parsed as a yt-dlp option', async () => {
+  const injected = '--config-locations=\\attacker\share\yt-dlp.conf';
+
+  const download = createYtDlpSpawnRecorder();
+  const downloadApi = loadElectronMain({ childProcessMock: download.childProcessMock }).api;
+  await downloadApi.runYtDlpDownload({
+    request: { trackId: 't', title: 'T' },
+    outputTemplate: path.join(os.tmpdir(), 'nexplay-never-written.%(ext)s'),
+    ffmpegLocation: '',
+    sourceUrl: injected
+  }).catch(() => {});
+
+  const stream = createYtDlpSpawnRecorder();
+  const streamApi = loadElectronMain({ childProcessMock: stream.childProcessMock }).api;
+  await streamApi.resolveOnlineTrackAudioStream({ canonicalUrl: injected }).catch(() => {});
+
+  for (const [label, calls] of [['download', download.spawnCalls], ['stream', stream.spawnCalls]]) {
+    assert.ok(calls.length > 0, `${label} should spawn yt-dlp`);
+    const args = calls[0];
+    const index = args.indexOf(injected);
+    assert.ok(index > 0, `${label} should pass the source URL`);
+    assert.equal(args[index - 1], '--', `${label} must end option parsing before the source URL`);
   }
 });
 
