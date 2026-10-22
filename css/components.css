@@ -1665,6 +1665,23 @@ body[data-density="compact"] #settings-page .holo-panel {
 	        }
 
 
+/* The row actions never shrink, so in narrow rows they used to squeeze the title to
+   nothing. Give the title cluster a floor and let the actions wrap below it instead. */
+.library-track-item[data-view="list"] {
+    flex-wrap: wrap;
+    column-gap: 1rem;
+    row-gap: 0.25rem;
+}
+
+.library-track-item[data-view="list"] > :first-child {
+    flex: 1 1 13rem;
+}
+
+.library-track-item[data-view="list"] > :last-child {
+    margin-left: auto;
+}
+
+
 	        .track-active {
 	            background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent);
 	            border-left: 3px solid var(--accent-color) !important;

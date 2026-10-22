@@ -38,5 +38,6 @@ import './ios-integration.test.mjs';
 import './mobile-sleep-timer.test.mjs';
 import './desktop-sleep-timer.test.mjs';
 import './markup-attribute-escaping.test.mjs';
+import './desktop-ui-regressions.test.mjs';
 
 import './playback-engine.test.mjs';
