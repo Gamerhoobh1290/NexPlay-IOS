@@ -28,7 +28,11 @@ internal static class SafetyTestProgram
             PostCommitLaunchFailureDoesNotThrow,
             SuccessfulInstallCommitsAndRemovesBackup,
             FailedInstallRollsBackCompleteDirectory,
-            DownloadedUpdateWithoutSha256IsRefused
+            DownloadedUpdateWithoutSha256IsRefused,
+            DownloadReportsProgressToCompletion,
+            DownloadProgressIsDescribedForPeople,
+            InstalledVersionPrefersExecutableThenReceipt,
+            RegistryRefreshUpdatesUninstallEntryVersion
         };
 
         try
@@ -460,6 +464,74 @@ internal static class SafetyTestProgram
             {
                 Invoke("TryDeleteDirectory", plan.TemporaryDirectory);
             }
+        }
+    }
+
+    private static void DownloadReportsProgressToCompletion()
+    {
+        using var scope = new TemporaryDirectory();
+        var source = Path.Combine(scope.Path, "artifact.zip");
+        var bytes = new byte[700_000];
+        new Random(7).NextBytes(bytes);
+        File.WriteAllBytes(source, bytes);
+        var destination = Path.Combine(scope.Path, "download.zip");
+        var reports = new List<(long Copied, long? Total)>();
+
+        Invoke("DownloadFileFromLocation", source, destination, false, new Action<long, long?>((copied, total) => reports.Add((copied, total))));
+
+        True(reports.Count > 0, "download reported no progress");
+        Equal((long)bytes.Length, reports[^1].Copied, "final reported byte count");
+        Equal((long?)bytes.Length, reports[^1].Total, "reported total size");
+        True(reports.Zip(reports.Skip(1)).All(pair => pair.First.Copied <= pair.Second.Copied), "progress went backwards");
+        True(File.ReadAllBytes(destination).SequenceEqual(bytes), "downloaded bytes differ from the source");
+    }
+
+    private static void DownloadProgressIsDescribedForPeople()
+    {
+        const long mb = 1024 * 1024;
+        Equal("50.0 MB of 143.0 MB · 12.5 MB/s", (string)Invoke("DescribeDownloadProgress", 50 * mb, (long?)(143 * mb), TimeSpan.FromSeconds(4))!, "known size with speed");
+        Equal("50.0 MB downloaded", (string)Invoke("DescribeDownloadProgress", 50 * mb, (long?)null, TimeSpan.Zero)!, "unknown size without speed");
+    }
+
+    private static void InstalledVersionPrefersExecutableThenReceipt()
+    {
+        using var scope = new TemporaryDirectory();
+        Equal("2.0.2", (string)Invoke("DetectInstalledVersionLabel", scope.Path, "2.0.2")!, "registry fallback");
+
+        File.WriteAllText(Path.Combine(scope.Path, ".nexplay-updater-release.json"), "{ \"Version\": \"2.2.1.0\" }");
+        Equal("2.2.1.0", (string)Invoke("DetectInstalledVersionLabel", scope.Path, "2.0.2")!, "applied release receipt");
+
+        // The executable is the binary actually installed, so it outranks a receipt
+        // a later NSIS reinstall may have left behind.
+        var executable = Path.Combine(scope.Path, "NexPlay.exe");
+        File.Copy(typeof(UpdateLauncher).Assembly.Location, executable);
+        var fileVersion = FileVersionInfo.GetVersionInfo(executable);
+        var expected = !string.IsNullOrWhiteSpace(fileVersion.ProductVersion) ? fileVersion.ProductVersion! : fileVersion.FileVersion!;
+        Equal(expected, (string)Invoke("DetectInstalledVersionLabel", scope.Path, "2.0.2")!, "installed executable version");
+    }
+
+    private static void RegistryRefreshUpdatesUninstallEntryVersion()
+    {
+        var testRoot = $@"Software\NexPlayUpdaterSafetyTests\{Guid.NewGuid():N}";
+        try
+        {
+            using var versioned = Microsoft.Win32.Registry.CurrentUser.CreateSubKey($@"{testRoot}\versioned");
+            versioned.SetValue("DisplayName", "NexPlay 2.0.2");
+            versioned.SetValue("DisplayVersion", "2.0.2");
+            Invoke("WriteInstalledEntryVersion", versioned, "2.2.2.0");
+            Equal("NexPlay 2.2.2.0", versioned.GetValue("DisplayName") as string, "versioned display name");
+            Equal("2.2.2.0", versioned.GetValue("DisplayVersion") as string, "display version");
+
+            using var plain = Microsoft.Win32.Registry.CurrentUser.CreateSubKey($@"{testRoot}\plain");
+            plain.SetValue("DisplayName", "NexPlay");
+            plain.SetValue("DisplayVersion", "2.0.2");
+            Invoke("WriteInstalledEntryVersion", plain, "2.2.2.0");
+            Equal("NexPlay", plain.GetValue("DisplayName") as string, "unversioned display name is left alone");
+            Equal("2.2.2.0", plain.GetValue("DisplayVersion") as string, "unversioned entry version");
+        }
+        finally
+        {
+            Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(@"Software\NexPlayUpdaterSafetyTests", throwOnMissingSubKey: false);
         }
     }
 

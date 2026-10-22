@@ -49,6 +49,7 @@ internal interface IUpdaterUi
     bool CompleteAndAskLaunch(string title, string detail, string launchText, string closeText);
     void MessageAndWait(string title, string detail, bool isError);
     void FailAndWait(string title, string detail);
+    void ShowRelease(string installedVersion, string? availableVersion, string? packageSize) { }
 }
 
 internal sealed class UpdaterWindow : Form, IUpdaterUi
@@ -799,7 +800,6 @@ internal static class UpdateLauncher
                 entry = CreatePortableInstalledEntry(installDirectory);
             }
 
-            ui?.Report("Locating NexPlay", $"Found app folder. Registry version: {FormatVersionLabel(entry.DisplayVersion)}", 10);
             if (string.IsNullOrWhiteSpace(installDirectory))
             {
                 installDirectory = !string.IsNullOrWhiteSpace(options.InstallDirectory)
@@ -807,6 +807,10 @@ internal static class UpdateLauncher
                     : ResolveInstallDirectory(entry);
             }
             Log($"Resolved install directory: {installDirectory}");
+            entry = entry with { InstalledVersionLabel = DetectInstalledVersionLabel(installDirectory, entry.DisplayVersion) };
+            Log($"Installed release: {entry.InstalledVersionLabel}. Registry version: {FormatVersionLabel(entry.DisplayVersion)}.");
+            ui?.ShowRelease(entry.InstalledVersionLabel, null, null);
+            ui?.Report("Locating NexPlay", $"Found NexPlay {entry.InstalledVersionLabel}.", 10);
 
             if (HasOrphanedUpdateTransaction(installDirectory))
             {
@@ -842,6 +846,10 @@ internal static class UpdateLauncher
             {
                 ui?.Report("Checking for updates", manifestUrl, 18);
                 remoteUpdate = CheckRemoteUpdate(manifestUrl, entry, options, installDirectory);
+                ui?.ShowRelease(
+                    GetDisplayedInstalledVersionLabel(entry, remoteUpdate),
+                    remoteUpdate.VersionLabel,
+                    remoteUpdate.ExpectedSize is > 0 ? FormatSize(remoteUpdate.ExpectedSize.Value) : null);
                 if (!remoteUpdate.UpdateAvailable)
                 {
                     var installedVersionLabel = GetDisplayedInstalledVersionLabel(entry, remoteUpdate);
@@ -1004,6 +1012,7 @@ internal static class UpdateLauncher
                 CleanupRollbackBackup(transaction?.DirectoryPath ?? string.Empty, preserveRollbackDirectory);
             }
             Log($"Update finished successfully. Synced files: {result.SyncedFiles}. Removed files: {result.RemovedFiles}.");
+            RefreshInstalledEntryVersion(entry, DetectInstalledVersionLabel(installDirectory, entry.DisplayVersion));
 
             if (!options.Silent)
             {
@@ -1110,7 +1119,8 @@ internal static class UpdateLauncher
                 uninstallString?.Trim() ?? string.Empty,
                 installLocation?.Trim() ?? string.Empty,
                 displayIcon?.Trim() ?? string.Empty,
-                ParseVersion(appKey.GetValue("DisplayVersion") as string));
+                ParseVersion(appKey.GetValue("DisplayVersion") as string),
+                Registry: new UninstallRegistryKey(hive, view, subKeyName));
         }
     }
 
@@ -1444,7 +1454,73 @@ internal static class UpdateLauncher
             return remoteUpdate.AppliedReleaseVersionLabel;
         }
 
-        return FormatVersionLabel(entry.DisplayVersion);
+        return string.IsNullOrWhiteSpace(entry.InstalledVersionLabel)
+            ? FormatVersionLabel(entry.DisplayVersion)
+            : entry.InstalledVersionLabel;
+    }
+
+    // Windows' uninstall entry is only written by the installer, so after
+    // updater-applied releases it goes stale; trust the installed files first.
+    private static string DetectInstalledVersionLabel(string installDirectory, string registryVersion)
+    {
+        var executablePath = Path.Combine(installDirectory, ProductExecutableName);
+        if (File.Exists(executablePath))
+        {
+            try
+            {
+                var versionInfo = FileVersionInfo.GetVersionInfo(executablePath);
+                var executableVersion = FirstNonEmpty(versionInfo.ProductVersion, versionInfo.FileVersion);
+                if (!string.IsNullOrWhiteSpace(executableVersion))
+                {
+                    return executableVersion.Trim();
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"Could not read the installed NexPlay executable version: {ex.Message}");
+            }
+        }
+
+        var receiptVersion = LoadAppliedReleaseReceipt(installDirectory)?.Version;
+        return string.IsNullOrWhiteSpace(receiptVersion)
+            ? FormatVersionLabel(registryVersion)
+            : receiptVersion.Trim();
+    }
+
+    private static void RefreshInstalledEntryVersion(InstalledAppEntry entry, string versionLabel)
+    {
+        if (entry.Registry is null || string.IsNullOrWhiteSpace(versionLabel))
+        {
+            return;
+        }
+
+        try
+        {
+            using var baseKey = RegistryKey.OpenBaseKey(entry.Registry.Hive, entry.Registry.View);
+            using var appKey = baseKey.OpenSubKey($@"{UninstallRegistryPath}\{entry.Registry.SubKeyName}", writable: true);
+            if (appKey is null)
+            {
+                return;
+            }
+
+            WriteInstalledEntryVersion(appKey, versionLabel);
+            Log($"Updated the Windows uninstall entry to {versionLabel}.");
+        }
+        catch (Exception ex)
+        {
+            // The update itself is already committed; a stale label is not worth failing it.
+            Log($"Could not update the Windows uninstall entry version: {ex.Message}");
+        }
+    }
+
+    private static void WriteInstalledEntryVersion(RegistryKey appKey, string versionLabel)
+    {
+        appKey.SetValue("DisplayVersion", versionLabel, RegistryValueKind.String);
+        var displayName = (appKey.GetValue("DisplayName") as string)?.Trim() ?? string.Empty;
+        if (Regex.IsMatch(displayName, $@"^{ProductName} \d+(\.\d+)*$", RegexOptions.IgnoreCase))
+        {
+            appKey.SetValue("DisplayName", $"{ProductName} {versionLabel}", RegistryValueKind.String);
+        }
     }
 
     private static bool IsAppliedReleaseReceiptCurrent(
@@ -1689,7 +1765,7 @@ internal static class UpdateLauncher
             ? string.Empty
             : $"{Environment.NewLine}{Environment.NewLine}Notes:{Environment.NewLine}{TruncateForMessage(remoteUpdate.Notes, 700)}";
 
-        return $"A {ProductName} update is available.{Environment.NewLine}{Environment.NewLine}Installed version: {FormatVersionLabel(entry.DisplayVersion)}{Environment.NewLine}Latest version: {remoteUpdate.VersionLabel}{sizeLine}{dateLine}{notesLine}";
+        return $"A {ProductName} update is available.{Environment.NewLine}{Environment.NewLine}Installed version: {GetDisplayedInstalledVersionLabel(entry)}{Environment.NewLine}Latest version: {remoteUpdate.VersionLabel}{sizeLine}{dateLine}{notesLine}";
     }
 
     private static string DownloadAndPrepareRemoteUpdate(
@@ -1719,7 +1795,13 @@ internal static class UpdateLauncher
 
         Log($"Downloading update artifact: {remoteUpdate.ArtifactLocation}");
         ui?.Report("Downloading update", remoteUpdate.ArtifactLocation, 38);
-        DownloadFileFromLocation(remoteUpdate.ArtifactLocation, archivePath, options.AllowInsecureUpdateUrl);
+        var downloadClock = Stopwatch.StartNew();
+        DownloadFileFromLocation(remoteUpdate.ArtifactLocation, archivePath, options.AllowInsecureUpdateUrl, (copied, total) =>
+        {
+            var expected = total ?? remoteUpdate.ExpectedSize;
+            var fraction = expected is > 0 ? Math.Clamp(copied / (double)expected.Value, 0d, 1d) : 0d;
+            ui?.Report("Downloading update", DescribeDownloadProgress(copied, expected, downloadClock.Elapsed), 38 + (int)Math.Round(9 * fraction));
+        });
 
         var archiveInfo = new FileInfo(archivePath);
         if (remoteUpdate.ExpectedSize is > 0 && archiveInfo.Length != remoteUpdate.ExpectedSize.Value)
@@ -1787,7 +1869,11 @@ internal static class UpdateLauncher
         return response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
     }
 
-    private static void DownloadFileFromLocation(string location, string destinationPath, bool allowInsecure)
+    private static void DownloadFileFromLocation(
+        string location,
+        string destinationPath,
+        bool allowInsecure,
+        Action<long, long?>? onProgress)
     {
         if (TryGetLocalFilePath(location, out var localPath))
         {
@@ -1796,7 +1882,8 @@ internal static class UpdateLauncher
                 throw new FileNotFoundException("The local update artifact was not found.", localPath);
             }
 
-            File.Copy(localPath, destinationPath, overwrite: true);
+            using var localSource = File.OpenRead(localPath);
+            CopyWithProgress(localSource, destinationPath, localSource.Length, onProgress);
             return;
         }
 
@@ -1804,8 +1891,39 @@ internal static class UpdateLauncher
         using var response = client.GetAsync(location, HttpCompletionOption.ResponseHeadersRead).GetAwaiter().GetResult();
         response.EnsureSuccessStatusCode();
         using var source = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+        CopyWithProgress(source, destinationPath, response.Content.Headers.ContentLength, onProgress);
+    }
+
+    private static void CopyWithProgress(Stream source, string destinationPath, long? totalBytes, Action<long, long?>? onProgress)
+    {
         using var destination = File.Create(destinationPath);
-        source.CopyTo(destination);
+        var buffer = new byte[81920];
+        var copied = 0L;
+        var sinceReport = Stopwatch.StartNew();
+        int read;
+        while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            destination.Write(buffer, 0, read);
+            copied += read;
+            // Throttled so a fast local copy does not flood the UI thread.
+            if (onProgress is not null && sinceReport.ElapsedMilliseconds >= 150)
+            {
+                onProgress(copied, totalBytes);
+                sinceReport.Restart();
+            }
+        }
+
+        onProgress?.Invoke(copied, totalBytes);
+    }
+
+    private static string DescribeDownloadProgress(long copiedBytes, long? totalBytes, TimeSpan elapsed)
+    {
+        var amount = totalBytes is > 0
+            ? $"{FormatSize(copiedBytes)} of {FormatSize(totalBytes.Value)}"
+            : $"{FormatSize(copiedBytes)} downloaded";
+        return elapsed.TotalSeconds >= 1
+            ? $"{amount} · {FormatSize((long)(copiedBytes / elapsed.TotalSeconds))}/s"
+            : amount;
     }
 
     private static HttpClient CreateHttpClient()
@@ -2217,9 +2335,7 @@ internal static class UpdateLauncher
             return true;
         }
 
-        var versionLine = string.IsNullOrWhiteSpace(entry.DisplayVersion)
-            ? string.Empty
-            : $"Installed version: {entry.DisplayVersion}{Environment.NewLine}";
+        var versionLine = $"Installed version: {GetDisplayedInstalledVersionLabel(entry)}{Environment.NewLine}";
 
         var payloadSummary = BuildSourcePayloadSummary(sourceDirectory);
         var payloadLine = string.IsNullOrWhiteSpace(payloadSummary)
@@ -3632,7 +3748,11 @@ internal sealed record InstalledAppEntry(
     string UninstallCommand,
     string InstallLocation,
     string DisplayIcon,
-    Version Version);
+    Version Version,
+    string InstalledVersionLabel = "",
+    UninstallRegistryKey? Registry = null);
+
+internal sealed record UninstallRegistryKey(RegistryHive Hive, RegistryView View, string SubKeyName);
 
 internal sealed record UpdateResult(int SyncedFiles, int RemovedFiles);
 
