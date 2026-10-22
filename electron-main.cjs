@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, session } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, session, shell } = require('electron');
 const { spawn, spawnSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -959,17 +959,42 @@ async function fetchApprovedRemoteJson(payload = {}) {
   }
 }
 
-function isTrustedRendererSender(event) {
-  let senderUrl = '';
+function isLocalAppUrl(rawUrl = '') {
   try {
-    senderUrl = String(event?.senderFrame?.url || event?.sender?.getURL?.() || '');
-    const parsed = new URL(senderUrl);
+    const parsed = new URL(String(rawUrl || ''));
     return parsed.protocol === 'http:'
       && parsed.hostname === HOST
       && parsed.port === String(localPort || FIXED_PORT);
   } catch (_) {
     return false;
   }
+}
+
+function isTrustedRendererSender(event) {
+  return isLocalAppUrl(event?.senderFrame?.url || event?.sender?.getURL?.() || '');
+}
+
+function openInSystemBrowser(rawUrl = '') {
+  try {
+    const parsed = new URL(String(rawUrl || ''));
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+      shell.openExternal(parsed.toString()).catch(() => {});
+    }
+  } catch (_) {}
+}
+
+// External pages belong in the user's browser, which shows the address and
+// keeps their sign-ins out of NexPlay's session.
+function restrictWindowNavigation(contents) {
+  contents.setWindowOpenHandler(({ url }) => {
+    if (!isLocalAppUrl(url)) openInSystemBrowser(url);
+    return { action: 'deny' };
+  });
+  contents.on('will-navigate', (event, url) => {
+    if (isLocalAppUrl(url)) return;
+    event.preventDefault();
+    openInSystemBrowser(url);
+  });
 }
 
 function registerTrustedIpcHandler(channel, handler) {
@@ -2736,6 +2761,7 @@ async function createWindow() {
       preload: PRELOAD_PATH
     }
   });
+  restrictWindowNavigation(win.webContents);
   const version = encodeURIComponent(app.getVersion());
   win.loadURL(`http://${HOST}:${port}/?nexplay_desktop_version=${version}`);
 }

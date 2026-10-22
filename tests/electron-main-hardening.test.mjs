@@ -22,7 +22,8 @@ function loadElectronMain({
   sessionMock = null,
   appVersion = 'test',
   packageMetadata = { build: { buildVersion: 'test-build' } },
-  childProcessMock = null
+  childProcessMock = null,
+  shellMock = { openExternal() {} }
 } = {}) {
   const appEvents = new Map();
   const calls = {
@@ -66,7 +67,8 @@ function loadElectronMain({
     BrowserWindow: BrowserWindowMock,
     dialog: {},
     ipcMain: { handle() {} },
-    session: { defaultSession: sessionMock || {} }
+    session: { defaultSession: sessionMock || {} },
+    shell: shellMock
   };
   const moduleRecord = { exports: {} };
   const sandbox = {
@@ -90,7 +92,7 @@ function loadElectronMain({
     AbortController,
     fetch: fetchImpl
   };
-  const instrumentedSource = `${electronMainSource}\nmodule.exports.__hardeningTestApi = { MIME_TYPES, getDesktopSecurityHeaders, requestHandler, resolveRequestToFile, isWithinRoot, focusExistingWindow, fetchApprovedRemoteJson, migrateDesktopShellCache, allowExternalMediaPath, buildExternalMediaUrl, runYtDlpDownload, resolveOnlineTrackAudioStream };`;
+  const instrumentedSource = `${electronMainSource}\nmodule.exports.__hardeningTestApi = { MIME_TYPES, getDesktopSecurityHeaders, requestHandler, resolveRequestToFile, isWithinRoot, focusExistingWindow, fetchApprovedRemoteJson, migrateDesktopShellCache, allowExternalMediaPath, buildExternalMediaUrl, runYtDlpDownload, resolveOnlineTrackAudioStream, restrictWindowNavigation };`;
   vm.runInNewContext(instrumentedSource, sandbox, { filename: electronMainPath });
 
   return {
@@ -203,6 +205,36 @@ test('external media route refuses non-media files even when a renderer allowlis
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('external links open in the system browser and the app window never navigates away', () => {
+  const opened = [];
+  const { api } = loadElectronMain({ shellMock: { openExternal: (url) => { opened.push(url); } } });
+  const listeners = {};
+  let windowOpenHandler = null;
+  api.restrictWindowNavigation({
+    setWindowOpenHandler(handler) { windowOpenHandler = handler; },
+    on(eventName, handler) { listeners[eventName] = handler; }
+  });
+
+  assert.equal(windowOpenHandler({ url: 'https://soundiiz.com/tutorial/spotify-to-youtube-music' }).action, 'deny');
+  assert.equal(windowOpenHandler({ url: 'javascript:alert(1)' }).action, 'deny');
+
+  const navigate = (url) => {
+    let prevented = false;
+    listeners['will-navigate']({ preventDefault() { prevented = true; } }, url);
+    return prevented;
+  };
+  assert.equal(navigate('http://localhost:5000/?nexplay_desktop_version=2.2.1'), false, 'in-app navigation stays allowed');
+  assert.equal(navigate('https://www.youtube.com/watch?v=be_OvnHtwzA'), true);
+  assert.equal(navigate('file:///C:/Windows/win.ini'), true);
+  assert.equal(navigate('http://localhost:5001/'), true, 'a different local port is not the app');
+
+  assert.deepEqual(opened, [
+    'https://soundiiz.com/tutorial/spotify-to-youtube-music',
+    'https://www.youtube.com/watch?v=be_OvnHtwzA',
+    'http://localhost:5001/'
+  ]);
 });
 
 test('a renderer-supplied source URL can never be parsed as a yt-dlp option', async () => {
