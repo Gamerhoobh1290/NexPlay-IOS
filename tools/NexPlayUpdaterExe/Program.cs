@@ -55,37 +55,58 @@ internal interface IUpdaterUi
 internal sealed class UpdaterWindow : Form, IUpdaterUi
 {
     private static readonly Color AppBackground = Color.FromArgb(4, 5, 8);
-    private static readonly Color PanelFill = Color.FromArgb(10, 10, 12);
+    private static readonly Color PanelFill = Color.FromArgb(10, 12, 18);
     private static readonly Color PanelFillAlt = Color.FromArgb(12, 16, 26);
     private static readonly Color BorderSubtle = Color.FromArgb(34, 255, 255, 255);
     private static readonly Color TextMuted = Color.FromArgb(148, 163, 184);
     private static readonly Color TextSoft = Color.FromArgb(203, 213, 225);
     private static readonly Color BrandCyan = Color.FromArgb(19, 224, 255);
     private static readonly Color BrandCyanSoft = Color.FromArgb(186, 230, 253);
-    private static readonly Color BrandTeal = Color.FromArgb(45, 212, 191);
     private static readonly Color BrandGreen = Color.FromArgb(187, 247, 208);
     private static readonly Color BrandAmber = Color.FromArgb(254, 240, 138);
-    private static readonly Color BrandViolet = Color.FromArgb(168, 85, 247);
+    private static readonly Color BrandRed = Color.FromArgb(254, 202, 202);
+    private static readonly Color ProgressTrackColor = Color.FromArgb(28, 37, 56);
+    private static readonly Color ProgressFailedColor = Color.FromArgb(248, 113, 113);
+
+    private const int CollapsedHeight = 548;
+    private const int ExpandedHeight = 728;
+
+    private static readonly string[] StepNames = { "CHECK", "DOWNLOAD", "VERIFY", "INSTALL" };
+    // A step is complete once progress reaches its threshold (see the launcher's Report values).
+    private static readonly int[] StepThresholds = { 25, 48, 60, 100 };
+
+    private enum UiState
+    {
+        Working,
+        Choice,
+        Info,
+        Failed,
+        Complete
+    }
 
     private readonly string[] _args;
-    private readonly Label _headline = new();
-    private readonly Label _detail = new();
-    private readonly Label _progressLabel = new();
     private readonly Label _statusBadge = new();
+    private readonly Label _installedValue = new();
+    private readonly Label _availableValue = new();
+    private readonly Label _packageValue = new();
+    private readonly Label _headline = new();
+    private readonly TextBox _detail = new();
     private readonly Panel _progressTrack = new();
     private readonly Panel _progressFill = new();
+    private readonly Label _progressLabel = new();
     private readonly Label[] _stepLabels = { new(), new(), new(), new() };
+    private readonly LinkLabel _detailsToggle = new();
+    private readonly LinkLabel _openLog = new();
     private readonly TextBox _log = new();
     private readonly Button _primaryButton = new();
     private readonly Button _secondaryButton = new();
     private Action? _primaryAction;
     private Action? _secondaryAction;
     private int _currentProgress;
+    private UiState _state = UiState.Working;
+    private string _lastLoggedTitle = string.Empty;
     private bool _runStarted;
     private bool _canClose;
-
-    private static readonly string[] StepNames = { "CHECK", "DOWNLOAD", "INSTALL", "FINISH" };
-    private static readonly int[] StepThresholds = { 18, 52, 84, 100 };
 
     public int ExitCode { get; private set; } = 1;
 
@@ -123,6 +144,11 @@ internal sealed class UpdaterWindow : Form, IUpdaterUi
             {
                 _secondaryAction.Invoke();
             }
+            else if (_state is UiState.Info or UiState.Failed)
+            {
+                // Only "Close" is offered, so the title-bar X means the same thing.
+                _primaryAction?.Invoke();
+            }
 
             e.Cancel = true;
             return;
@@ -136,48 +162,62 @@ internal sealed class UpdaterWindow : Form, IUpdaterUi
         RunOnUi(() =>
         {
             UseWaitCursor = true;
-            _statusBadge.Text = "WORKING";
-            _statusBadge.ForeColor = BrandCyanSoft;
-            _statusBadge.BackColor = Color.FromArgb(17, 36, 55);
+            _state = UiState.Working;
+            SetBadge("WORKING", BrandCyanSoft, Color.FromArgb(17, 36, 55));
             _headline.Text = title;
-            _detail.Text = detail;
+            SetDetail(detail);
             SetProgress(progress);
             _primaryButton.Visible = false;
             _secondaryButton.Visible = false;
-            AppendLog(title, detail);
+            if (!string.Equals(title, _lastLoggedTitle, StringComparison.Ordinal))
+            {
+                AppendLog(title, detail);
+            }
         });
     }
 
     public bool Confirm(string title, string detail, string confirmText, string cancelText, int progress)
     {
-        return WaitForChoice(title, detail, confirmText, cancelText, progress, true);
+        return WaitForChoice(title, detail, confirmText, cancelText, progress, UiState.Choice);
     }
 
     public bool CompleteAndAskLaunch(string title, string detail, string launchText, string closeText)
     {
-        return WaitForChoice(title, detail, launchText, closeText, 100, true);
+        return WaitForChoice(title, detail, launchText, closeText, 100, UiState.Complete);
     }
 
     public void MessageAndWait(string title, string detail, bool isError)
     {
-        WaitForChoice(title, detail, "Close", string.Empty, isError ? 0 : 100, false);
+        WaitForChoice(title, detail, "Close", string.Empty, _currentProgress, isError ? UiState.Failed : UiState.Info);
     }
 
     public void FailAndWait(string title, string detail)
     {
-        WaitForChoice(title, detail, "Close", string.Empty, 0, false);
+        WaitForChoice(title, detail, "Close", string.Empty, _currentProgress, UiState.Failed);
+    }
+
+    public void ShowRelease(string installedVersion, string? availableVersion, string? packageSize)
+    {
+        RunOnUi(() =>
+        {
+            _installedValue.Text = string.IsNullOrWhiteSpace(installedVersion) ? "Unknown" : installedVersion;
+            _availableValue.Text = string.IsNullOrWhiteSpace(availableVersion) ? "—" : availableVersion;
+            _packageValue.Text = string.IsNullOrWhiteSpace(packageSize) ? "—" : packageSize;
+        });
     }
 
     private void BuildUi()
     {
+        SuspendLayout();
+        AutoScaleDimensions = new SizeF(96F, 96F);
+        AutoScaleMode = AutoScaleMode.Dpi;
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
         Text = "NexPlay Updater";
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
         MinimizeBox = true;
-        ControlBox = true;
-        ClientSize = new Size(820, 560);
+        ClientSize = new Size(760, CollapsedHeight);
         BackColor = AppBackground;
         ForeColor = Color.White;
         Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
@@ -189,192 +229,105 @@ internal sealed class UpdaterWindow : Form, IUpdaterUi
         {
         }
 
-        var shell = new Panel
-        {
-            Dock = DockStyle.Fill,
-            Padding = new Padding(28),
-            BackColor = BackColor
-        };
-        Controls.Add(shell);
-
-        var topGlow = new AccentStrip
+        Controls.Add(new AccentStrip
         {
             Location = new Point(0, 0),
             Size = new Size(ClientSize.Width, 3),
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-        };
-        shell.Controls.Add(topGlow);
+        });
+        Controls.Add(new BrandMark { Location = new Point(28, 26), Size = new Size(46, 46) });
+        Controls.Add(CreateLabel("NexPlay Updater", new Point(86, 23), new Size(380, 32), Color.White, AppBackground, new Font("Segoe UI Semibold", 16F, FontStyle.Bold, GraphicsUnit.Point)));
+        Controls.Add(CreateLabel("Windows desktop app", new Point(88, 54), new Size(380, 20), TextMuted, AppBackground, new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point)));
 
-        var logo = new BrandMark
-        {
-            Location = new Point(30, 28),
-            Size = new Size(50, 50)
-        };
-        shell.Controls.Add(logo);
-
-        var brand = new Label
-        {
-            Text = "NEXPLAY",
-            Location = new Point(94, 25),
-            Size = new Size(260, 32),
-            BackColor = AppBackground,
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI Black", 20F, FontStyle.Bold, GraphicsUnit.Point)
-        };
-        shell.Controls.Add(brand);
-
-        var caption = new Label
-        {
-            Text = "HYPERION UPDATE CHANNEL",
-            Location = new Point(96, 58),
-            Size = new Size(280, 22),
-            BackColor = AppBackground,
-            ForeColor = TextMuted,
-            Font = new Font("Consolas", 8.5F, FontStyle.Bold, GraphicsUnit.Point)
-        };
-        shell.Controls.Add(caption);
-
-        var desktopBadge = CreateBadge("DESKTOP APP", new Point(558, 32), new Size(118, 28), BrandCyanSoft, Color.FromArgb(18, 38, 58));
-        shell.Controls.Add(desktopBadge);
-
-        _statusBadge.Text = "READY";
-        _statusBadge.Location = new Point(686, 32);
-        _statusBadge.Size = new Size(104, 28);
+        _statusBadge.Location = new Point(604, 34);
+        _statusBadge.Size = new Size(128, 28);
         _statusBadge.TextAlign = ContentAlignment.MiddleCenter;
-        _statusBadge.ForeColor = BrandGreen;
-        _statusBadge.BackColor = Color.FromArgb(20, 44, 34);
         _statusBadge.Font = new Font("Segoe UI Semibold", 8F, FontStyle.Bold, GraphicsUnit.Point);
-        shell.Controls.Add(_statusBadge);
+        _statusBadge.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        SetBadge("STARTING", BrandCyanSoft, Color.FromArgb(17, 36, 55));
+        Controls.Add(_statusBadge);
 
-        var brandRail = new HoloPanel
+        var releasePanel = new HoloPanel
         {
-            Location = new Point(30, 98),
-            Size = new Size(190, 348),
+            Location = new Point(28, 92),
+            Size = new Size(704, 70),
             FillColor = PanelFill,
             BorderColor = BorderSubtle,
-            Radius = 24
+            Radius = 16
         };
-        shell.Controls.Add(brandRail);
+        Controls.Add(releasePanel);
+        AddReleaseField(releasePanel, "INSTALLED", _installedValue, 22, Color.White, "Checking…");
+        releasePanel.Controls.Add(CreateLabel("→", new Point(226, 24), new Size(40, 30), BrandCyan, PanelFill, new Font("Segoe UI Semibold", 15F, FontStyle.Bold, GraphicsUnit.Point)));
+        AddReleaseField(releasePanel, "NEW VERSION", _availableValue, 276, BrandCyanSoft, "—");
+        AddReleaseField(releasePanel, "PACKAGE", _packageValue, 520, TextSoft, "—");
 
-        var railTitle = new Label
+        var card = new HoloPanel
         {
-            Text = "NEXPLAY",
-            Location = new Point(22, 28),
-            Size = new Size(142, 32),
-            BackColor = PanelFill,
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI Black", 18F, FontStyle.Bold, GraphicsUnit.Point)
-        };
-        brandRail.Controls.Add(railTitle);
-
-        var railSubtitle = new Label
-        {
-            Text = "UPDATE MANAGER",
-            Location = new Point(24, 62),
-            Size = new Size(140, 22),
-            BackColor = PanelFill,
-            ForeColor = BrandCyanSoft,
-            Font = new Font("Consolas", 8.5F, FontStyle.Bold, GraphicsUnit.Point)
-        };
-        brandRail.Controls.Add(railSubtitle);
-
-        var railCopy = new Label
-        {
-            Text = "Official Windows release channel for the NexPlay desktop app.",
-            Location = new Point(24, 108),
-            Size = new Size(138, 66),
-            BackColor = PanelFill,
-            ForeColor = TextSoft,
-            Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point)
-        };
-        brandRail.Controls.Add(railCopy);
-
-        var railDivider = new Panel
-        {
-            Location = new Point(24, 194),
-            Size = new Size(138, 1),
-            BackColor = Color.FromArgb(36, 255, 255, 255)
-        };
-        brandRail.Controls.Add(railDivider);
-
-        var railPillOne = CreateBadge("SIGNED PAYLOAD", new Point(24, 222), new Size(138, 28), BrandGreen, Color.FromArgb(16, 45, 37));
-        var railPillTwo = CreateBadge("APP.ASAR READY", new Point(24, 262), new Size(138, 28), BrandCyanSoft, Color.FromArgb(14, 39, 61));
-        brandRail.Controls.Add(railPillOne);
-        brandRail.Controls.Add(railPillTwo);
-
-        var surface = new HoloPanel
-        {
-            Location = new Point(240, 98),
-            Size = new Size(550, 348),
+            Location = new Point(28, 176),
+            Size = new Size(704, 270),
             FillColor = PanelFillAlt,
             BorderColor = BorderSubtle,
-            Radius = 24,
+            Radius = 20,
             AccentColor = BrandCyan
         };
-        shell.Controls.Add(surface);
+        Controls.Add(card);
 
-        _headline.Location = new Point(28, 28);
-        _headline.Size = new Size(488, 42);
+        _headline.Location = new Point(24, 22);
+        _headline.Size = new Size(656, 32);
         _headline.BackColor = PanelFillAlt;
         _headline.ForeColor = Color.White;
-        _headline.Font = new Font("Segoe UI Black", 17F, FontStyle.Bold, GraphicsUnit.Point);
+        _headline.AutoEllipsis = true;
+        _headline.Font = new Font("Segoe UI Semibold", 15F, FontStyle.Bold, GraphicsUnit.Point);
         _headline.Text = "Preparing updater";
-        surface.Controls.Add(_headline);
+        card.Controls.Add(_headline);
 
-        _detail.Location = new Point(30, 78);
-        _detail.Size = new Size(490, 62);
+        // A read-only text box rather than a label so long messages and release
+        // notes scroll instead of being cut off.
+        _detail.Location = new Point(26, 62);
+        _detail.Size = new Size(652, 100);
+        _detail.Multiline = true;
+        _detail.ReadOnly = true;
+        _detail.TabStop = false;
+        _detail.BorderStyle = BorderStyle.None;
         _detail.BackColor = PanelFillAlt;
         _detail.ForeColor = TextSoft;
         _detail.Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point);
         _detail.Text = "Starting NexPlay update checks.";
-        surface.Controls.Add(_detail);
+        _detail.HandleCreated += (_, _) => UseDarkScrollbars(_detail);
+        card.Controls.Add(_detail);
 
-        _progressTrack.Location = new Point(30, 154);
-        _progressTrack.Size = new Size(418, 14);
-        _progressTrack.BackColor = Color.FromArgb(28, 37, 56);
-        _progressTrack.Resize += (_, _) => SetProgress(_currentProgress);
-        surface.Controls.Add(_progressTrack);
-
+        _progressTrack.Location = new Point(24, 180);
+        _progressTrack.Size = new Size(584, 8);
+        _progressTrack.BackColor = ProgressTrackColor;
+        card.Controls.Add(_progressTrack);
         _progressFill.Location = new Point(0, 0);
-        _progressFill.Size = new Size(0, 14);
+        _progressFill.Size = new Size(0, 8);
         _progressFill.BackColor = BrandCyan;
         _progressTrack.Controls.Add(_progressFill);
 
-        _progressLabel.Location = new Point(462, 144);
-        _progressLabel.Size = new Size(58, 30);
+        _progressLabel.Location = new Point(616, 170);
+        _progressLabel.Size = new Size(64, 26);
         _progressLabel.TextAlign = ContentAlignment.MiddleRight;
         _progressLabel.BackColor = PanelFillAlt;
         _progressLabel.ForeColor = BrandCyan;
         _progressLabel.Font = new Font("Segoe UI Semibold", 11F, FontStyle.Bold, GraphicsUnit.Point);
-        _progressLabel.Text = "0%";
-        surface.Controls.Add(_progressLabel);
+        card.Controls.Add(_progressLabel);
 
         for (var index = 0; index < _stepLabels.Length; index++)
         {
             var step = _stepLabels[index];
             step.Text = StepNames[index];
-            step.Location = new Point(30 + (index * 122), 190);
-            step.Size = new Size(108, 27);
+            step.Location = new Point(24 + (index * 167), 210);
+            step.Size = new Size(155, 34);
             step.TextAlign = ContentAlignment.MiddleCenter;
-            step.BackColor = Color.FromArgb(20, 27, 42);
-            step.ForeColor = TextMuted;
-            step.Font = new Font("Segoe UI Semibold", 8F, FontStyle.Bold, GraphicsUnit.Point);
-            surface.Controls.Add(step);
+            step.Font = new Font("Segoe UI Semibold", 8.5F, FontStyle.Bold, GraphicsUnit.Point);
+            card.Controls.Add(step);
         }
 
-        var activityLabel = new Label
-        {
-            Text = "UPDATE ACTIVITY",
-            Location = new Point(30, 238),
-            Size = new Size(120, 20),
-            BackColor = PanelFillAlt,
-            ForeColor = Color.FromArgb(226, 232, 240),
-            Font = new Font("Segoe UI Semibold", 8.5F, FontStyle.Bold, GraphicsUnit.Point)
-        };
-        surface.Controls.Add(activityLabel);
-
-        _log.Location = new Point(30, 264);
-        _log.Size = new Size(490, 54);
+        // Sized for the collapsed window; the bottom anchor grows it when details expand.
+        _log.Location = new Point(28, 462);
+        _log.Size = new Size(704, CollapsedHeight - 462 - 82);
+        _log.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
         _log.Multiline = true;
         _log.ReadOnly = true;
         _log.ScrollBars = ScrollBars.Vertical;
@@ -382,48 +335,91 @@ internal sealed class UpdaterWindow : Form, IUpdaterUi
         _log.BackColor = Color.FromArgb(5, 8, 14);
         _log.ForeColor = Color.FromArgb(156, 178, 211);
         _log.Font = new Font("Consolas", 8.5F, FontStyle.Regular, GraphicsUnit.Point);
-        surface.Controls.Add(_log);
+        _log.Visible = false;
+        _log.HandleCreated += (_, _) => UseDarkScrollbars(_log);
+        Controls.Add(_log);
 
-        var footerLabel = new Label
-        {
-            Text = "NEXPLAY DESKTOP RUNTIME",
-            Location = new Point(32, 480),
-            Size = new Size(240, 22),
-            BackColor = AppBackground,
-            ForeColor = TextMuted,
-            Font = new Font("Consolas", 8.5F, FontStyle.Bold, GraphicsUnit.Point)
-        };
-        shell.Controls.Add(footerLabel);
+        ConfigureLink(_detailsToggle, "Show details", new Point(28, CollapsedHeight - 56));
+        _detailsToggle.LinkClicked += (_, _) => ToggleDetails();
+        Controls.Add(_detailsToggle);
+        ConfigureLink(_openLog, "Open log file", new Point(136, CollapsedHeight - 56));
+        _openLog.LinkClicked += (_, _) => OpenLogFile();
+        Controls.Add(_openLog);
 
-        _secondaryButton.Location = new Point(500, 474);
-        _secondaryButton.Size = new Size(132, 42);
+        _secondaryButton.Location = new Point(420, CollapsedHeight - 66);
+        _secondaryButton.Size = new Size(128, 42);
+        _secondaryButton.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
         ApplySecondaryButtonStyle(_secondaryButton);
         _secondaryButton.Visible = false;
         _secondaryButton.Click += (_, _) => _secondaryAction?.Invoke();
-        shell.Controls.Add(_secondaryButton);
+        Controls.Add(_secondaryButton);
 
-        _primaryButton.Location = new Point(646, 474);
-        _primaryButton.Size = new Size(144, 42);
+        _primaryButton.Location = new Point(560, CollapsedHeight - 66);
+        _primaryButton.Size = new Size(172, 42);
+        _primaryButton.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
         ApplyPrimaryButtonStyle(_primaryButton);
         _primaryButton.Visible = false;
         _primaryButton.Click += (_, _) => _primaryAction?.Invoke();
-        shell.Controls.Add(_primaryButton);
+        Controls.Add(_primaryButton);
 
         SetProgress(0);
+        ResumeLayout(false);
     }
 
-    private static Label CreateBadge(string text, Point location, Size size, Color foreColor, Color backColor)
+    private static Label CreateLabel(string text, Point location, Size size, Color foreColor, Color backColor, Font font)
     {
         return new Label
         {
             Text = text,
             Location = location,
             Size = size,
-            BackColor = backColor,
             ForeColor = foreColor,
-            TextAlign = ContentAlignment.MiddleCenter,
-            Font = new Font("Segoe UI Semibold", 7.5F, FontStyle.Bold, GraphicsUnit.Point)
+            BackColor = backColor,
+            Font = font,
+            AutoEllipsis = true
         };
+    }
+
+    private static void AddReleaseField(HoloPanel panel, string caption, Label value, int left, Color valueColor, string initialValue)
+    {
+        panel.Controls.Add(CreateLabel(caption, new Point(left, 13), new Size(190, 16), TextMuted, panel.FillColor, new Font("Consolas", 8F, FontStyle.Bold, GraphicsUnit.Point)));
+        value.Text = initialValue;
+        value.Location = new Point(left, 31);
+        value.Size = new Size(190, 28);
+        value.ForeColor = valueColor;
+        value.BackColor = panel.FillColor;
+        value.AutoEllipsis = true;
+        value.Font = new Font("Segoe UI Semibold", 13F, FontStyle.Bold, GraphicsUnit.Point);
+        panel.Controls.Add(value);
+    }
+
+    [System.Runtime.InteropServices.DllImport("uxtheme.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int SetWindowTheme(IntPtr hWnd, string subAppName, string? subIdList);
+
+    private static void UseDarkScrollbars(Control control)
+    {
+        try
+        {
+            // Windows 10 1809+ ships a dark Explorer theme; older systems keep the default.
+            SetWindowTheme(control.Handle, "DarkMode_Explorer", null);
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private static void ConfigureLink(LinkLabel link, string text, Point location)
+    {
+        link.Text = text;
+        link.Location = location;
+        link.AutoSize = true;
+        link.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        link.BackColor = AppBackground;
+        link.LinkColor = BrandCyanSoft;
+        link.ActiveLinkColor = BrandCyan;
+        link.VisitedLinkColor = BrandCyanSoft;
+        link.LinkBehavior = LinkBehavior.HoverUnderline;
+        link.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
     }
 
     private static void ApplyPrimaryButtonStyle(Button button)
@@ -434,7 +430,7 @@ internal sealed class UpdaterWindow : Form, IUpdaterUi
         button.FlatAppearance.MouseDownBackColor = Color.FromArgb(103, 232, 249);
         button.BackColor = BrandCyan;
         button.ForeColor = Color.FromArgb(3, 8, 15);
-        button.Font = new Font("Segoe UI Semibold", 8.5F, FontStyle.Bold, GraphicsUnit.Point);
+        button.Font = new Font("Segoe UI Semibold", 9.5F, FontStyle.Bold, GraphicsUnit.Point);
         button.Cursor = Cursors.Hand;
         button.AutoEllipsis = true;
     }
@@ -447,7 +443,7 @@ internal sealed class UpdaterWindow : Form, IUpdaterUi
         button.FlatAppearance.MouseDownBackColor = Color.FromArgb(38, 49, 72);
         button.BackColor = Color.FromArgb(16, 22, 36);
         button.ForeColor = Color.FromArgb(218, 226, 242);
-        button.Font = new Font("Segoe UI Semibold", 8.5F, FontStyle.Bold, GraphicsUnit.Point);
+        button.Font = new Font("Segoe UI Semibold", 9.5F, FontStyle.Bold, GraphicsUnit.Point);
         button.Cursor = Cursors.Hand;
         button.AutoEllipsis = true;
     }
@@ -458,7 +454,7 @@ internal sealed class UpdaterWindow : Form, IUpdaterUi
         string primaryText,
         string secondaryText,
         int progress,
-        bool hasNegativeChoice)
+        UiState state)
     {
         using var wait = new ManualResetEventSlim(false);
         var result = false;
@@ -466,19 +462,29 @@ internal sealed class UpdaterWindow : Form, IUpdaterUi
         RunOnUi(() =>
         {
             UseWaitCursor = false;
-            _statusBadge.Text = hasNegativeChoice ? "ACTION NEEDED" : "READY";
-            _statusBadge.ForeColor = hasNegativeChoice
-                ? BrandAmber
-                : BrandGreen;
-            _statusBadge.BackColor = hasNegativeChoice
-                ? Color.FromArgb(66, 48, 18)
-                : Color.FromArgb(20, 44, 34);
+            _state = state;
+            switch (state)
+            {
+                case UiState.Choice:
+                    SetBadge("ACTION NEEDED", BrandAmber, Color.FromArgb(66, 48, 18));
+                    break;
+                case UiState.Failed:
+                    SetBadge("FAILED", BrandRed, Color.FromArgb(69, 22, 26));
+                    break;
+                case UiState.Complete:
+                    SetBadge("UPDATED", BrandGreen, Color.FromArgb(20, 44, 34));
+                    break;
+                default:
+                    SetBadge("READY", BrandGreen, Color.FromArgb(20, 44, 34));
+                    break;
+            }
+
             _headline.Text = title;
-            _detail.Text = detail;
+            SetDetail(detail);
             SetProgress(progress);
             AppendLog(title, detail);
 
-            _primaryButton.Text = FormatButtonLabel(primaryText);
+            _primaryButton.Text = primaryText;
             _primaryButton.Enabled = true;
             _primaryButton.Visible = true;
             _primaryAction = () =>
@@ -489,9 +495,10 @@ internal sealed class UpdaterWindow : Form, IUpdaterUi
                 wait.Set();
             };
 
+            var hasNegativeChoice = state is UiState.Choice or UiState.Complete;
             if (hasNegativeChoice && !string.IsNullOrWhiteSpace(secondaryText))
             {
-                _secondaryButton.Text = FormatButtonLabel(secondaryText);
+                _secondaryButton.Text = secondaryText;
                 _secondaryButton.Enabled = true;
                 _secondaryButton.Visible = true;
                 _secondaryAction = () =>
@@ -507,6 +514,9 @@ internal sealed class UpdaterWindow : Form, IUpdaterUi
                 _secondaryButton.Visible = false;
                 _secondaryAction = null;
             }
+
+            AcceptButton = _primaryButton;
+            _primaryButton.Focus();
         });
 
         wait.Wait();
@@ -517,61 +527,113 @@ internal sealed class UpdaterWindow : Form, IUpdaterUi
             _secondaryButton.Visible = false;
             _primaryAction = null;
             _secondaryAction = null;
+            AcceptButton = null;
         });
 
         return result;
+    }
+
+    private void SetBadge(string text, Color foreColor, Color backColor)
+    {
+        _statusBadge.Text = text;
+        _statusBadge.ForeColor = foreColor;
+        _statusBadge.BackColor = backColor;
+    }
+
+    private void SetDetail(string detail)
+    {
+        _detail.Text = (detail ?? string.Empty).Replace("\r\n", "\n").Replace("\n", Environment.NewLine);
+        _detail.SelectionLength = 0;
+        var needed = TextRenderer.MeasureText(
+            _detail.Text,
+            _detail.Font,
+            new Size(_detail.ClientSize.Width - 6, int.MaxValue),
+            TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl);
+        var scrollBars = needed.Height > _detail.ClientSize.Height ? ScrollBars.Vertical : ScrollBars.None;
+        if (_detail.ScrollBars != scrollBars)
+        {
+            _detail.ScrollBars = scrollBars;
+        }
     }
 
     private void SetProgress(int progress)
     {
         _currentProgress = Math.Clamp(progress, 0, 100);
         _progressLabel.Text = $"{_currentProgress}%";
-
-        if (_progressTrack.ClientSize.Width > 0)
-        {
-            var fillWidth = (int)Math.Round(_progressTrack.ClientSize.Width * (_currentProgress / 100d));
-            _progressFill.Width = _currentProgress > 0
-                ? Math.Max(8, fillWidth)
-                : 0;
-            _progressFill.Height = _progressTrack.ClientSize.Height;
-        }
-
-        UpdateStepStyles(_currentProgress);
+        _progressLabel.ForeColor = _state == UiState.Failed ? ProgressFailedColor : BrandCyan;
+        _progressFill.BackColor = _state == UiState.Failed ? ProgressFailedColor : BrandCyan;
+        var fillWidth = (int)Math.Round(_progressTrack.ClientSize.Width * (_currentProgress / 100d));
+        _progressFill.Width = _currentProgress > 0 ? Math.Max(6, fillWidth) : 0;
+        _progressFill.Height = _progressTrack.ClientSize.Height;
+        UpdateStepStyles();
     }
 
-    private void UpdateStepStyles(int progress)
+    private void UpdateStepStyles()
     {
+        var activeIndex = Array.FindIndex(StepThresholds, threshold => _currentProgress < threshold);
         for (var index = 0; index < _stepLabels.Length; index++)
         {
-            var completed = progress >= StepThresholds[index];
-            var active = !completed && (index == 0 || progress >= StepThresholds[index - 1]);
+            var completed = _currentProgress >= StepThresholds[index];
+            var current = index == activeIndex;
             var label = _stepLabels[index];
-
-            label.BackColor = completed
-                ? Color.FromArgb(17, 94, 89)
-                : active
-                    ? Color.FromArgb(20, 45, 72)
-                    : Color.FromArgb(20, 27, 42);
-            label.ForeColor = completed
-                ? Color.FromArgb(204, 251, 241)
-                : active
-                    ? BrandCyanSoft
-                    : TextMuted;
+            if (completed)
+            {
+                label.BackColor = Color.FromArgb(17, 94, 89);
+                label.ForeColor = Color.FromArgb(204, 251, 241);
+                label.Text = "✓  " + StepNames[index];
+            }
+            else if (current && _state == UiState.Failed)
+            {
+                label.BackColor = Color.FromArgb(69, 22, 26);
+                label.ForeColor = BrandRed;
+                label.Text = "✕  " + StepNames[index];
+            }
+            else if (current && _state is UiState.Working or UiState.Choice)
+            {
+                label.BackColor = Color.FromArgb(20, 45, 72);
+                label.ForeColor = BrandCyanSoft;
+                label.Text = StepNames[index];
+            }
+            else
+            {
+                label.BackColor = Color.FromArgb(20, 27, 42);
+                label.ForeColor = TextMuted;
+                label.Text = StepNames[index];
+            }
         }
     }
 
-    private static string FormatButtonLabel(string value)
+    private void ToggleDetails()
     {
-        return string.IsNullOrWhiteSpace(value)
-            ? string.Empty
-            : value.Trim().ToUpperInvariant();
+        var expand = !_log.Visible;
+        ClientSize = new Size(ClientSize.Width, expand ? ExpandedHeight : CollapsedHeight);
+        _log.Visible = expand;
+        _detailsToggle.Text = expand ? "Hide details" : "Show details";
+        if (expand)
+        {
+            _log.SelectionStart = _log.TextLength;
+            _log.ScrollToCaret();
+        }
+    }
+
+    private static void OpenLogFile()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(UpdateLauncher.LogFilePath) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"The updater log could not be opened.{Environment.NewLine}{Environment.NewLine}{ex.Message}", "NexPlay Updater", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
     }
 
     private void AppendLog(string title, string detail)
     {
+        _lastLoggedTitle = title;
         var cleanDetail = string.IsNullOrWhiteSpace(detail)
             ? string.Empty
-            : " - " + detail.Replace(Environment.NewLine, " ");
+            : " - " + detail.Replace("\r\n", " ").Replace("\n", " ");
         _log.AppendText($"[{DateTime.Now:HH:mm:ss}] {title}{cleanDetail}{Environment.NewLine}");
     }
 
@@ -748,6 +810,7 @@ internal static class UpdateLauncher
     private const int NetworkTimeoutSeconds = 45;
     private static readonly StringComparer PathComparer = StringComparer.OrdinalIgnoreCase;
     private static readonly string LogPath = Path.Combine(Path.GetTempPath(), "NexPlayUpdater.log");
+    internal static string LogFilePath => LogPath;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -850,6 +913,7 @@ internal static class UpdateLauncher
                     GetDisplayedInstalledVersionLabel(entry, remoteUpdate),
                     remoteUpdate.VersionLabel,
                     remoteUpdate.ExpectedSize is > 0 ? FormatSize(remoteUpdate.ExpectedSize.Value) : null);
+                ui?.Report("Checked for updates", $"Latest release: {remoteUpdate.VersionLabel}.", 25);
                 if (!remoteUpdate.UpdateAvailable)
                 {
                     var installedVersionLabel = GetDisplayedInstalledVersionLabel(entry, remoteUpdate);
@@ -1012,14 +1076,19 @@ internal static class UpdateLauncher
                 CleanupRollbackBackup(transaction?.DirectoryPath ?? string.Empty, preserveRollbackDirectory);
             }
             Log($"Update finished successfully. Synced files: {result.SyncedFiles}. Removed files: {result.RemovedFiles}.");
-            RefreshInstalledEntryVersion(entry, DetectInstalledVersionLabel(installDirectory, entry.DisplayVersion));
+            var installedNow = DetectInstalledVersionLabel(installDirectory, entry.DisplayVersion);
+            RefreshInstalledEntryVersion(entry, installedNow);
+            ui?.ShowRelease(
+                installedNow,
+                installedNow,
+                remoteUpdate?.ExpectedSize is > 0 ? FormatSize(remoteUpdate.ExpectedSize.Value) : null);
 
             if (!options.Silent)
             {
                 var launchNow = ui is not null
                     ? ui.CompleteAndAskLaunch(
-                        "NexPlay is up to date",
-                        $"Synced files: {result.SyncedFiles}{Environment.NewLine}Removed stale files: {result.RemovedFiles}",
+                        $"NexPlay {installedNow} is installed",
+                        $"Updated {result.SyncedFiles} app files and removed {result.RemovedFiles} old ones.{Environment.NewLine}{Environment.NewLine}Your library, playlists and settings are stored separately and were not changed.",
                         "Launch NexPlay",
                         "Close")
                     : MessageBox.Show(
@@ -1760,7 +1829,7 @@ internal static class UpdateLauncher
             : string.Empty;
         var dateLine = string.IsNullOrWhiteSpace(remoteUpdate.PublishedAt)
             ? string.Empty
-            : $"{Environment.NewLine}Published: {remoteUpdate.PublishedAt}";
+            : $"{Environment.NewLine}Published: {FormatPublishedDate(remoteUpdate.PublishedAt)}";
         var notesLine = string.IsNullOrWhiteSpace(remoteUpdate.Notes)
             ? string.Empty
             : $"{Environment.NewLine}{Environment.NewLine}Notes:{Environment.NewLine}{TruncateForMessage(remoteUpdate.Notes, 700)}";
@@ -2095,6 +2164,13 @@ internal static class UpdateLauncher
     private static string FormatVersionLabel(string? version)
     {
         return string.IsNullOrWhiteSpace(version) ? "unknown" : version.Trim();
+    }
+
+    private static string FormatPublishedDate(string publishedAt)
+    {
+        return DateTimeOffset.TryParse(publishedAt, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var published)
+            ? published.ToLocalTime().ToString("d MMMM yyyy", System.Globalization.CultureInfo.CurrentCulture)
+            : publishedAt;
     }
 
     private static string FormatSize(long bytes)
@@ -3285,12 +3361,20 @@ internal static class UpdateLauncher
 
         if (ui is not null)
         {
-            var title = icon == MessageBoxIcon.Error
-                ? "Update failed"
-                : message.Contains("up to date", StringComparison.OrdinalIgnoreCase)
-                    ? "NexPlay is up to date"
-                    : "Updater status";
-            ui.MessageAndWait(title, message, icon == MessageBoxIcon.Error);
+            if (icon == MessageBoxIcon.Error)
+            {
+                ui.MessageAndWait("Update failed", message, true);
+                return;
+            }
+
+            // The first line of these messages reads as a headline ("NexPlay is up to date.").
+            var lines = message.Split(new[] { "\r\n", "\n" }, 2, StringSplitOptions.None);
+            var firstLine = lines[0].Trim().TrimEnd('.');
+            var useFirstLine = firstLine.Length is > 0 and <= 64;
+            ui.MessageAndWait(
+                useFirstLine ? firstLine : "Updater status",
+                useFirstLine && lines.Length > 1 ? lines[1].Trim() : message,
+                false);
             return;
         }
 
