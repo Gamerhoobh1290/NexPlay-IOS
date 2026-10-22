@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
@@ -87,7 +88,7 @@ function loadElectronMain({
     AbortController,
     fetch: fetchImpl
   };
-  const instrumentedSource = `${electronMainSource}\nmodule.exports.__hardeningTestApi = { MIME_TYPES, getDesktopSecurityHeaders, requestHandler, resolveRequestToFile, isWithinRoot, focusExistingWindow, fetchApprovedRemoteJson, migrateDesktopShellCache };`;
+  const instrumentedSource = `${electronMainSource}\nmodule.exports.__hardeningTestApi = { MIME_TYPES, getDesktopSecurityHeaders, requestHandler, resolveRequestToFile, isWithinRoot, focusExistingWindow, fetchApprovedRemoteJson, migrateDesktopShellCache, allowExternalMediaPath, buildExternalMediaUrl };`;
   vm.runInNewContext(instrumentedSource, sandbox, { filename: electronMainPath });
 
   return {
@@ -120,7 +121,6 @@ test('local HTTP routes return 400 for malformed percent encoding', () => {
   const { api } = loadElectronMain();
   const malformedUrls = [
     '/%',
-    '/__nexplay_media__?path=%25',
     '/__nexplay_online_stream__/%'
   ];
 
@@ -129,6 +129,29 @@ test('local HTTP routes return 400 for malformed percent encoding', () => {
     assert.equal(response.statusCode, 400, url);
     assert.equal(response.body, 'Bad Request', url);
     assert.equal(response.ended, true, url);
+  }
+});
+
+test('external media route serves an allowed file whose name contains a percent sign', async () => {
+  const { api } = loadElectronMain();
+  const mediaDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nexplay-media-route-'));
+  try {
+    for (const name of ['Artist - 100% Pure.mp3', 'Artist - a%20b.mp3']) {
+      const mediaPath = path.join(mediaDir, name);
+      fs.writeFileSync(mediaPath, 'ID3');
+      const allowedPath = api.allowExternalMediaPath(mediaPath);
+      const response = await new Promise((resolve) => {
+        const res = {
+          statusCode: null,
+          writeHead(statusCode) { this.statusCode = statusCode; },
+          end() { resolve(this); }
+        };
+        api.requestHandler({ method: 'HEAD', url: api.buildExternalMediaUrl(allowedPath), headers: {} }, res);
+      });
+      assert.equal(response.statusCode, 200, name);
+    }
+  } finally {
+    fs.rmSync(mediaDir, { recursive: true, force: true });
   }
 });
 

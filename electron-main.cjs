@@ -424,14 +424,8 @@ function requestHandler(req, res) {
     pathname = '/';
   }
   if (pathname === EXTERNAL_MEDIA_ROUTE && requestUrl) {
-    let requestedPath = '';
-    try {
-      requestedPath = decodeRequestComponent(requestUrl.searchParams.get('path') || '');
-    } catch (error) {
-      if (!(error instanceof MalformedRequestEncodingError)) throw error;
-      writeBadRequest(res);
-      return;
-    }
+    // searchParams already percent-decodes; decoding again breaks names with "%".
+    const requestedPath = requestUrl.searchParams.get('path') || '';
     if (!requestedPath || !isAllowedExternalMediaPath(requestedPath)) {
       res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('Forbidden');
