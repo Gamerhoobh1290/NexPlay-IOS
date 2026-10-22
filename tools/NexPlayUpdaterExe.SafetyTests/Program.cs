@@ -27,7 +27,8 @@ internal static class SafetyTestProgram
             FailedOrphanRecoveryPreservesDurableBackup,
             PostCommitLaunchFailureDoesNotThrow,
             SuccessfulInstallCommitsAndRemovesBackup,
-            FailedInstallRollsBackCompleteDirectory
+            FailedInstallRollsBackCompleteDirectory,
+            DownloadedUpdateWithoutSha256IsRefused
         };
 
         try
@@ -432,6 +433,33 @@ internal static class SafetyTestProgram
         catch (TargetInvocationException ex) when (ex.InnerException is not null)
         {
             throw ex.InnerException;
+        }
+    }
+
+    private static void DownloadedUpdateWithoutSha256IsRefused()
+    {
+        using var scope = new TemporaryDirectory();
+        var payload = Directory.CreateDirectory(Path.Combine(scope.Path, "payload", "win-unpacked")).FullName;
+        File.WriteAllText(Path.Combine(payload, "NexPlay.exe"), "not a real executable");
+        var archive = Path.Combine(scope.Path, "update.zip");
+        System.IO.Compression.ZipFile.CreateFromDirectory(Path.Combine(scope.Path, "payload"), archive);
+
+        var plan = new RemoteUpdatePlan { ArtifactLocation = archive, VersionLabel = "9.9.9", Sha256 = null };
+        var options = new UpdaterOptions(null, null, true, false, null, false, false, false, true);
+        try
+        {
+            Invoke("DownloadAndPrepareRemoteUpdate", plan, options, null);
+            throw new InvalidOperationException("An update without a SHA-256 checksum was accepted.");
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("SHA-256", StringComparison.Ordinal))
+        {
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(plan.TemporaryDirectory))
+            {
+                Invoke("TryDeleteDirectory", plan.TemporaryDirectory);
+            }
         }
     }
 

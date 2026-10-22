@@ -1704,6 +1704,12 @@ internal static class UpdateLauncher
             return localDirectory;
         }
 
+        if (string.IsNullOrWhiteSpace(remoteUpdate.Sha256))
+        {
+            throw new InvalidOperationException(
+                "The update manifest has no SHA-256 checksum, so the download cannot be verified. The update was not installed.");
+        }
+
         var tempRoot = CreateSecureWorkingDirectory("download");
         var archivePath = Path.Combine(tempRoot, "update.zip");
         var extractRoot = Path.Combine(tempRoot, "payload");
@@ -1722,15 +1728,8 @@ internal static class UpdateLauncher
                 $"The downloaded update size did not match the manifest. Expected {remoteUpdate.ExpectedSize.Value} bytes, got {archiveInfo.Length} bytes.");
         }
 
-        if (!string.IsNullOrWhiteSpace(remoteUpdate.Sha256))
-        {
-            ui?.Report("Verifying update", "Checking SHA-256 integrity.", 48);
-            ValidateFileSha256(archivePath, remoteUpdate.Sha256);
-        }
-        else
-        {
-            Log("The update manifest did not include a SHA-256 checksum.");
-        }
+        ui?.Report("Verifying update", "Checking SHA-256 integrity.", 48);
+        ValidateFileSha256(archivePath, remoteUpdate.Sha256);
 
         ui?.Report("Extracting update", "Preparing the downloaded package.", 52);
         try
