@@ -27,7 +27,15 @@ internal static class SafetyTestProgram
             FailedOrphanRecoveryPreservesDurableBackup,
             PostCommitLaunchFailureDoesNotThrow,
             SuccessfulInstallCommitsAndRemovesBackup,
-            FailedInstallRollsBackCompleteDirectory
+            FailedInstallRollsBackCompleteDirectory,
+            DownloadedUpdateWithoutSha256IsRefused,
+            DownloadReportsProgressToCompletion,
+            DownloadProgressIsDescribedForPeople,
+            InstalledVersionPrefersExecutableThenReceipt,
+            RegistryRefreshUpdatesUninstallEntryVersion,
+            DetailsToggleGrowsWindowAtEveryDpiScale,
+            EscapeChoosesTheDismissingButton,
+            DecorationIsNotATabStop
         };
 
         try
@@ -433,6 +441,227 @@ internal static class SafetyTestProgram
         {
             throw ex.InnerException;
         }
+    }
+
+    private static void DownloadedUpdateWithoutSha256IsRefused()
+    {
+        using var scope = new TemporaryDirectory();
+        var payload = Directory.CreateDirectory(Path.Combine(scope.Path, "payload", "win-unpacked")).FullName;
+        File.WriteAllText(Path.Combine(payload, "NexPlay.exe"), "not a real executable");
+        var archive = Path.Combine(scope.Path, "update.zip");
+        System.IO.Compression.ZipFile.CreateFromDirectory(Path.Combine(scope.Path, "payload"), archive);
+
+        var plan = new RemoteUpdatePlan { ArtifactLocation = archive, VersionLabel = "9.9.9", Sha256 = null };
+        var options = new UpdaterOptions(null, null, true, false, null, false, false, false, true);
+        try
+        {
+            Invoke("DownloadAndPrepareRemoteUpdate", plan, options, null);
+            throw new InvalidOperationException("An update without a SHA-256 checksum was accepted.");
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("SHA-256", StringComparison.Ordinal))
+        {
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(plan.TemporaryDirectory))
+            {
+                Invoke("TryDeleteDirectory", plan.TemporaryDirectory);
+            }
+        }
+    }
+
+    private static void DownloadReportsProgressToCompletion()
+    {
+        using var scope = new TemporaryDirectory();
+        var source = Path.Combine(scope.Path, "artifact.zip");
+        var bytes = new byte[700_000];
+        new Random(7).NextBytes(bytes);
+        File.WriteAllBytes(source, bytes);
+        var destination = Path.Combine(scope.Path, "download.zip");
+        var reports = new List<(long Copied, long? Total)>();
+
+        Invoke("DownloadFileFromLocation", source, destination, false, new Action<long, long?>((copied, total) => reports.Add((copied, total))));
+
+        True(reports.Count > 0, "download reported no progress");
+        Equal((long)bytes.Length, reports[^1].Copied, "final reported byte count");
+        Equal((long?)bytes.Length, reports[^1].Total, "reported total size");
+        True(reports.Zip(reports.Skip(1)).All(pair => pair.First.Copied <= pair.Second.Copied), "progress went backwards");
+        True(File.ReadAllBytes(destination).SequenceEqual(bytes), "downloaded bytes differ from the source");
+    }
+
+    private static void DownloadProgressIsDescribedForPeople()
+    {
+        const long mb = 1024 * 1024;
+        Equal("50.0 MB of 143.0 MB · 12.5 MB/s", (string)Invoke("DescribeDownloadProgress", 50 * mb, (long?)(143 * mb), TimeSpan.FromSeconds(4))!, "known size with speed");
+        Equal("50.0 MB downloaded", (string)Invoke("DescribeDownloadProgress", 50 * mb, (long?)null, TimeSpan.Zero)!, "unknown size without speed");
+    }
+
+    private static void InstalledVersionPrefersExecutableThenReceipt()
+    {
+        using var scope = new TemporaryDirectory();
+        Equal("2.0.2", (string)Invoke("DetectInstalledVersionLabel", scope.Path, "2.0.2")!, "registry fallback");
+
+        File.WriteAllText(Path.Combine(scope.Path, ".nexplay-updater-release.json"), "{ \"Version\": \"2.2.1.0\" }");
+        Equal("2.2.1.0", (string)Invoke("DetectInstalledVersionLabel", scope.Path, "2.0.2")!, "applied release receipt");
+
+        // The executable is the binary actually installed, so it outranks a receipt
+        // a later NSIS reinstall may have left behind.
+        var executable = Path.Combine(scope.Path, "NexPlay.exe");
+        File.Copy(typeof(UpdateLauncher).Assembly.Location, executable);
+        var fileVersion = FileVersionInfo.GetVersionInfo(executable);
+        var expected = !string.IsNullOrWhiteSpace(fileVersion.ProductVersion) ? fileVersion.ProductVersion! : fileVersion.FileVersion!;
+        Equal(expected, (string)Invoke("DetectInstalledVersionLabel", scope.Path, "2.0.2")!, "installed executable version");
+    }
+
+    private static void RegistryRefreshUpdatesUninstallEntryVersion()
+    {
+        var testRoot = $@"Software\NexPlayUpdaterSafetyTests\{Guid.NewGuid():N}";
+        try
+        {
+            using var versioned = Microsoft.Win32.Registry.CurrentUser.CreateSubKey($@"{testRoot}\versioned");
+            versioned.SetValue("DisplayName", "NexPlay 2.0.2");
+            versioned.SetValue("DisplayVersion", "2.0.2");
+            Invoke("WriteInstalledEntryVersion", versioned, "2.2.2.0");
+            Equal("NexPlay 2.2.2.0", versioned.GetValue("DisplayName") as string, "versioned display name");
+            Equal("2.2.2.0", versioned.GetValue("DisplayVersion") as string, "display version");
+
+            using var plain = Microsoft.Win32.Registry.CurrentUser.CreateSubKey($@"{testRoot}\plain");
+            plain.SetValue("DisplayName", "NexPlay");
+            plain.SetValue("DisplayVersion", "2.0.2");
+            Invoke("WriteInstalledEntryVersion", plain, "2.2.2.0");
+            Equal("NexPlay", plain.GetValue("DisplayName") as string, "unversioned display name is left alone");
+            Equal("2.2.2.0", plain.GetValue("DisplayVersion") as string, "unversioned entry version");
+        }
+        finally
+        {
+            Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(@"Software\NexPlayUpdaterSafetyTests", throwOnMissingSubKey: false);
+        }
+    }
+
+    private static void DetailsToggleGrowsWindowAtEveryDpiScale()
+    {
+        RunOnSta(() =>
+        {
+            foreach (var scale in new[] { 1F, 1.25F, 1.5F, 1.75F })
+            {
+                // Shown, because ToggleDetails reads the log's Visible state.
+                using var window = OpenOffscreenWindow();
+                // AutoScaleMode.Dpi applies exactly this scaling at 120, 144 and 168 DPI.
+                window.Scale(new SizeF(scale, scale));
+                var collapsed = window.ClientSize.Height;
+
+                InvokeInstance(window, "ToggleDetails");
+                var expanded = window.ClientSize.Height;
+                True(expanded > collapsed, $"Show details shrank the window at {scale:P0}: {collapsed} -> {expanded}");
+                Equal((int)Math.Round(collapsed * 728d / 548d), expanded, $"expanded height at {scale:P0}");
+                var log = Field<TextBox>(window, "_log");
+                True(log.Height > 0 && log.Bottom <= Field<Button>(window, "_primaryButton").Top, $"details log does not fit above the buttons at {scale:P0}");
+
+                InvokeInstance(window, "ToggleDetails");
+                Equal(collapsed, window.ClientSize.Height, $"collapsed height restored at {scale:P0}");
+                CloseWindow(window);
+            }
+        });
+    }
+
+    private static void EscapeChoosesTheDismissingButton()
+    {
+        RunOnSta(() =>
+        {
+            using var window = OpenOffscreenWindow();
+
+            var confirm = Task.Run(() => window.Confirm("Download update?", "detail", "Download and install", "Not now", 30));
+            PumpUntil(() => Field<Button>(window, "_secondaryButton").Visible, "confirm buttons");
+            True(PressEscape(window), "Escape was not handled on the confirm screen");
+            PumpUntil(() => confirm.IsCompleted, "confirm result");
+            Equal(false, confirm.Result, "Escape on the confirm screen means Not now");
+
+            var message = Task.Run(() => window.MessageAndWait("NexPlay is up to date", "detail", false));
+            PumpUntil(() => Field<Button>(window, "_primaryButton").Visible, "message button");
+            True(PressEscape(window), "Escape was not handled on a message screen");
+            PumpUntil(() => message.IsCompleted, "message dismissal");
+
+            CloseWindow(window);
+        });
+    }
+
+    private static void DecorationIsNotATabStop()
+    {
+        RunOnSta(() =>
+        {
+            using var window = OpenOffscreenWindow();
+            var decorations = window.Controls.Cast<Control>().Where(control => control is AccentStrip or BrandMark).ToList();
+            Equal(2, decorations.Count, "decorative controls found");
+            True(decorations.All(control => !control.CanSelect), "the accent strip or logo can take keyboard focus");
+            CloseWindow(window);
+        });
+    }
+
+    private static void RunOnSta(Action action)
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try { action(); }
+            catch (Exception ex) { failure = ex; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) throw new InvalidOperationException(failure.Message, failure);
+    }
+
+    private static UpdaterWindow OpenOffscreenWindow()
+    {
+        var window = new UpdaterWindow(Array.Empty<string>())
+        {
+            StartPosition = FormStartPosition.Manual,
+            Location = new Point(-32000, -32000),
+            ShowInTaskbar = false
+        };
+        // Pretend the update run already started so showing the window does not launch one.
+        SetField(window, "_runStarted", true);
+        window.Show();
+        Application.DoEvents();
+        return window;
+    }
+
+    private static void CloseWindow(UpdaterWindow window)
+    {
+        SetField(window, "_canClose", true);
+        window.Close();
+    }
+
+    private static bool PressEscape(Form window)
+    {
+        var processDialogKey = typeof(Form).GetMethod("ProcessDialogKey", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        return (bool)processDialogKey.Invoke(window, new object[] { Keys.Escape })!;
+    }
+
+    private static void PumpUntil(Func<bool> condition, string waitingFor)
+    {
+        var clock = Stopwatch.StartNew();
+        while (!condition())
+        {
+            if (clock.Elapsed > TimeSpan.FromSeconds(5)) throw new InvalidOperationException($"timed out waiting for {waitingFor}");
+            Application.DoEvents();
+            Thread.Sleep(10);
+        }
+    }
+
+    private static T Field<T>(object target, string name)
+    {
+        return (T)target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(target)!;
+    }
+
+    private static void SetField(object target, string name, object value)
+    {
+        target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(target, value);
+    }
+
+    private static void InvokeInstance(object target, string name)
+    {
+        target.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(target, null);
     }
 
     private static void ExpectUpdaterFailure(string methodName, params object?[] arguments)

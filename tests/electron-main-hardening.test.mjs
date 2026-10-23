@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
@@ -20,7 +21,9 @@ function loadElectronMain({
   userDataPath = electronMainDir,
   sessionMock = null,
   appVersion = 'test',
-  packageMetadata = { build: { buildVersion: 'test-build' } }
+  packageMetadata = { build: { buildVersion: 'test-build' } },
+  childProcessMock = null,
+  shellMock = { openExternal() {} }
 } = {}) {
   const appEvents = new Map();
   const calls = {
@@ -64,7 +67,8 @@ function loadElectronMain({
     BrowserWindow: BrowserWindowMock,
     dialog: {},
     ipcMain: { handle() {} },
-    session: { defaultSession: sessionMock || {} }
+    session: { defaultSession: sessionMock || {} },
+    shell: shellMock
   };
   const moduleRecord = { exports: {} };
   const sandbox = {
@@ -72,6 +76,7 @@ function loadElectronMain({
     exports: moduleRecord.exports,
     require(specifier) {
       if (specifier === './package.json') return packageMetadata;
+      if (specifier === 'child_process' && childProcessMock) return childProcessMock;
       return specifier === 'electron' ? electronMock : requireFromElectronMain(specifier);
     },
     __dirname: electronMainDir,
@@ -87,7 +92,7 @@ function loadElectronMain({
     AbortController,
     fetch: fetchImpl
   };
-  const instrumentedSource = `${electronMainSource}\nmodule.exports.__hardeningTestApi = { MIME_TYPES, getDesktopSecurityHeaders, requestHandler, resolveRequestToFile, isWithinRoot, focusExistingWindow, fetchApprovedRemoteJson, migrateDesktopShellCache };`;
+  const instrumentedSource = `${electronMainSource}\nmodule.exports.__hardeningTestApi = { MIME_TYPES, getDesktopSecurityHeaders, requestHandler, resolveRequestToFile, isWithinRoot, focusExistingWindow, fetchApprovedRemoteJson, migrateDesktopShellCache, allowExternalMediaPath, buildExternalMediaUrl, runYtDlpDownload, resolveOnlineTrackAudioStream, restrictWindowNavigation };`;
   vm.runInNewContext(instrumentedSource, sandbox, { filename: electronMainPath });
 
   return {
@@ -116,11 +121,30 @@ function invokeRequest(requestHandler, url) {
   return response;
 }
 
+test('local server refuses requests addressed to a foreign host name', () => {
+  const { api } = loadElectronMain();
+  const request = (host) => {
+    const response = {
+      statusCode: null,
+      writeHead(statusCode) { this.statusCode = statusCode; },
+      end() {}
+    };
+    api.requestHandler({ method: 'GET', url: '/__nexplay_online_stream__/missing', headers: { host } }, response);
+    return response.statusCode;
+  };
+  // A DNS-rebinding page reaches 127.0.0.1 but still sends its own host name.
+  assert.equal(request('attacker.example:5000'), 403);
+  assert.equal(request('localhost.attacker.example:5000'), 403);
+  assert.equal(request('localhost:5001'), 403);
+  for (const host of ['localhost:5000', 'LOCALHOST:5000', '127.0.0.1:5000', '[::1]:5000']) {
+    assert.equal(request(host), 404, host);
+  }
+});
+
 test('local HTTP routes return 400 for malformed percent encoding', () => {
   const { api } = loadElectronMain();
   const malformedUrls = [
     '/%',
-    '/__nexplay_media__?path=%25',
     '/__nexplay_online_stream__/%'
   ];
 
@@ -129,6 +153,132 @@ test('local HTTP routes return 400 for malformed percent encoding', () => {
     assert.equal(response.statusCode, 400, url);
     assert.equal(response.body, 'Bad Request', url);
     assert.equal(response.ended, true, url);
+  }
+});
+
+test('external media route serves an allowed file whose name contains a percent sign', async () => {
+  const { api } = loadElectronMain();
+  const mediaDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nexplay-media-route-'));
+  try {
+    for (const name of ['Artist - 100% Pure.mp3', 'Artist - a%20b.mp3']) {
+      const mediaPath = path.join(mediaDir, name);
+      fs.writeFileSync(mediaPath, 'ID3');
+      const allowedPath = api.allowExternalMediaPath(mediaPath);
+      const response = await new Promise((resolve) => {
+        const res = {
+          statusCode: null,
+          writeHead(statusCode) { this.statusCode = statusCode; },
+          end() { resolve(this); }
+        };
+        api.requestHandler({ method: 'HEAD', url: api.buildExternalMediaUrl(allowedPath), headers: {} }, res);
+      });
+      assert.equal(response.statusCode, 200, name);
+    }
+  } finally {
+    fs.rmSync(mediaDir, { recursive: true, force: true });
+  }
+});
+
+function createYtDlpSpawnRecorder() {
+  const spawnCalls = [];
+  const childProcessMock = {
+    spawnSync: (command, args) => ({ status: 0, stdout: `C:\fake\${args[0]}.exe
+` }),
+    spawn(command, args) {
+      spawnCalls.push(args);
+      const listeners = {};
+      const child = {
+        stdout: null,
+        stderr: null,
+        once(eventName, handler) {
+          listeners[eventName] = handler;
+          if (eventName === 'spawn') setTimeout(() => handler(), 0);
+          if (eventName === 'close') setTimeout(() => handler(1), 0);
+          return child;
+        },
+        on() { return child; },
+        removeListener() { return child; },
+        kill() {}
+      };
+      return child;
+    }
+  };
+  return { spawnCalls, childProcessMock };
+}
+
+test('external media route refuses non-media files even when a renderer allowlists them', async () => {
+  const { api } = loadElectronMain();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nexplay-media-route-'));
+  try {
+    const secretPath = path.join(dir, 'secret.txt');
+    fs.writeFileSync(secretPath, 'canary');
+    const allowedPath = api.allowExternalMediaPath(secretPath);
+    const response = await new Promise((resolve) => {
+      const res = {
+        statusCode: null,
+        writeHead(statusCode) { this.statusCode = statusCode; },
+        end() { resolve(this); }
+      };
+      api.requestHandler({ method: 'HEAD', url: api.buildExternalMediaUrl(allowedPath), headers: {} }, res);
+    });
+    assert.equal(response.statusCode, 403);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('external links open in the system browser and the app window never navigates away', () => {
+  const opened = [];
+  const { api } = loadElectronMain({ shellMock: { openExternal: (url) => { opened.push(url); } } });
+  const listeners = {};
+  let windowOpenHandler = null;
+  api.restrictWindowNavigation({
+    setWindowOpenHandler(handler) { windowOpenHandler = handler; },
+    on(eventName, handler) { listeners[eventName] = handler; }
+  });
+
+  assert.equal(windowOpenHandler({ url: 'https://soundiiz.com/tutorial/spotify-to-youtube-music' }).action, 'deny');
+  assert.equal(windowOpenHandler({ url: 'javascript:alert(1)' }).action, 'deny');
+
+  const navigate = (url) => {
+    let prevented = false;
+    listeners['will-navigate']({ preventDefault() { prevented = true; } }, url);
+    return prevented;
+  };
+  assert.equal(navigate('http://localhost:5000/?nexplay_desktop_version=2.2.1'), false, 'in-app navigation stays allowed');
+  assert.equal(navigate('https://www.youtube.com/watch?v=be_OvnHtwzA'), true);
+  assert.equal(navigate('file:///C:/Windows/win.ini'), true);
+  assert.equal(navigate('http://localhost:5001/'), true, 'a different local port is not the app');
+
+  assert.deepEqual(opened, [
+    'https://soundiiz.com/tutorial/spotify-to-youtube-music',
+    'https://www.youtube.com/watch?v=be_OvnHtwzA',
+    'http://localhost:5001/'
+  ]);
+});
+
+test('a renderer-supplied source URL can never be parsed as a yt-dlp option', async () => {
+  const injected = '--config-locations=\\attacker\share\yt-dlp.conf';
+
+  const download = createYtDlpSpawnRecorder();
+  const downloadApi = loadElectronMain({ childProcessMock: download.childProcessMock }).api;
+  await downloadApi.runYtDlpDownload({
+    request: { trackId: 't', title: 'T' },
+    outputTemplate: path.join(os.tmpdir(), 'nexplay-never-written.%(ext)s'),
+    ffmpegLocation: '',
+    sourceUrl: injected
+  }).catch(() => {});
+
+  const stream = createYtDlpSpawnRecorder();
+  const streamApi = loadElectronMain({ childProcessMock: stream.childProcessMock }).api;
+  await streamApi.resolveOnlineTrackAudioStream({ canonicalUrl: injected }).catch(() => {});
+
+  for (const [label, calls] of [['download', download.spawnCalls], ['stream', stream.spawnCalls]]) {
+    assert.ok(calls.length > 0, `${label} should spawn yt-dlp`);
+    const args = calls[0];
+    const index = args.indexOf(injected);
+    assert.ok(index > 0, `${label} should pass the source URL`);
+    assert.equal(args[index - 1], '--', `${label} must end option parsing before the source URL`);
   }
 });
 

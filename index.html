@@ -485,7 +485,7 @@
             
             <!-- Floating Art -->
 	            <div class="relative w-14 h-14 md:w-16 md:h-16 shrink-0 cursor-pointer group" onclick="openNowPlaying()">
-                <img id="mini-cover" src="" alt="Album art" class="w-full h-full rounded-full object-cover border-2 border-white/10 animate-[spin_10s_linear_infinite] group-hover:border-cyan-400 transition-colors">
+                <img id="mini-cover" src="" alt="Album art" class="w-full h-full rounded-full object-cover border-2 border-white/10 animate-[spin_10s_linear_infinite] group-hover:border-cyan-400 transition-colors hidden">
                 <div class="absolute inset-0 rounded-full flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
                     <i data-lucide="maximize-2" class="text-white w-5 h-5"></i>
                 </div>
@@ -524,7 +524,7 @@
                     </div>
                     <span id="mini-time-duration" class="text-[9px] font-mono text-gray-500 w-8">0:00</span>
                 </div>
-                <div id="mini-queue-peek" class="hidden"></div>
+                <div id="mini-queue-peek" class="hidden truncate text-[10px] font-mono text-gray-500"></div>
             </div>
 
             <!-- Volume/Queue -->
@@ -818,10 +818,10 @@
     </div>
 
     <!-- Edit Modal -->
-    <div id="edit-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-pop-in">
+    <div id="edit-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-pop-in" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
         <div class="holo-panel w-full max-w-md rounded-2xl p-8 shadow-2xl relative">
             <button onclick="closeEditModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white" aria-label="Close metadata editor"><i data-lucide="x" class="w-5 h-5"></i></button>
-            <h3 class="text-2xl font-black text-white mb-6 tracking-tight">METADATA</h3>
+            <h3 id="edit-modal-title" class="text-2xl font-black text-white mb-6 tracking-tight">METADATA</h3>
             <div class="space-y-4">
                 <div><label for="edit-title" class="text-[10px] text-gray-500 uppercase font-bold ml-1">Title</label><input type="text" id="edit-title" name="edit-title" class="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-cyan-500 outline-none transition-colors"></div>
                 <div><label for="edit-artist" class="text-[10px] text-gray-500 uppercase font-bold ml-1">Artist</label><input type="text" id="edit-artist" name="edit-artist" class="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-cyan-500 outline-none transition-colors"></div>
@@ -839,10 +839,10 @@
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div id="delete-confirm-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/80 backdrop-blur-md p-4">
+    <div id="delete-confirm-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/80 backdrop-blur-md p-4" role="dialog" aria-modal="true" aria-labelledby="delete-confirm-title">
         <div class="holo-panel w-full max-w-sm rounded-2xl p-6 shadow-2xl">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-xl font-bold text-white">Delete track?</h3>
+                <h3 id="delete-confirm-title" class="text-xl font-bold text-white">Delete track?</h3>
                 <button onclick="closeDeleteConfirm()" class="text-gray-500 hover:text-white" aria-label="Close delete confirmation"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
             <p id="delete-track-name" class="text-gray-300 text-sm mb-6">Are you sure?</p>
@@ -874,9 +874,9 @@
     </div>
 
     <!-- Shortcuts Modal -->
-    <div id="shortcuts-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-pop-in">
+    <div id="shortcuts-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-pop-in" role="dialog" aria-modal="true" aria-labelledby="shortcuts-modal-title">
         <div class="holo-panel w-full max-w-sm rounded-2xl p-6 shadow-2xl">
-            <h3 class="text-xl font-bold text-white mb-4">Key Bindings</h3>
+            <h3 id="shortcuts-modal-title" class="text-xl font-bold text-white mb-4">Key Bindings</h3>
             <div id="shortcuts-list" class="space-y-2 mb-6"></div>
             <div class="flex justify-end gap-3">
                 <button onclick="closeShortcutsModal()" class="px-4 py-2 text-sm text-gray-400 hover:text-white">Cancel</button>
@@ -917,10 +917,10 @@
     </div>
 
     <!-- Playlist Picker Modal -->
-    <div id="playlist-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/80 backdrop-blur-md p-4">
+    <div id="playlist-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/80 backdrop-blur-md p-4" role="dialog" aria-modal="true" aria-labelledby="playlist-modal-title">
         <div class="holo-panel w-full max-w-md rounded-2xl p-6 shadow-2xl">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-xl font-bold text-white">Add to Playlist</h3>
+                <h3 id="playlist-modal-title" class="text-xl font-bold text-white">Add to Playlist</h3>
                 <button onclick="closePlaylistModal()" class="text-gray-500 hover:text-white" aria-label="Close playlist picker"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
             <div class="space-y-3">

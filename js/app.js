@@ -7,6 +7,8 @@ import { init as initDomUtils } from './ui/dom-utils.js';
 import { init as initLayout } from './ui/layout.js';
 import { init as initTheme } from './ui/theme.js';
 import { init as initToast } from './ui/toast.js';
+import { init as initDialogFocus } from './ui/dialog-focus.js';
+import { init as initSettingHelpTooltips } from './ui/setting-help-tooltips.js';
 import { init as initPlayer } from './features/player.js';
 import { init as initSidebar } from './features/sidebar.js';
 import { init as initQueue } from './features/queue.js';
@@ -28,6 +30,8 @@ const modules = [
     ['ui/layout', initLayout],
     ['ui/theme', initTheme],
     ['ui/toast', initToast],
+    ['ui/dialog-focus', initDialogFocus],
+    ['ui/setting-help-tooltips', initSettingHelpTooltips],
     ['features/player', initPlayer],
     ['features/sidebar', initSidebar],
     ['features/queue', initQueue],

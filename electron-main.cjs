@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, session } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, session, shell } = require('electron');
 const { spawn, spawnSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -408,7 +408,20 @@ function pipeOnlineAudioStream(req, res, token, redirectCount = 0) {
   upstream.end();
 }
 
+function isAllowedRequestHost(hostHeader) {
+  // Browsers always send Host; a DNS-rebinding page sends its own name.
+  if (hostHeader === undefined) return true;
+  const port = String(localPort || FIXED_PORT);
+  const host = String(hostHeader).trim().toLowerCase();
+  return [`${HOST}:${port}`, `127.0.0.1:${port}`, `[::1]:${port}`].includes(host);
+}
+
 function requestHandler(req, res) {
+  if (!isAllowedRequestHost(req.headers?.host)) {
+    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Forbidden');
+    return;
+  }
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('Method Not Allowed');
@@ -424,14 +437,8 @@ function requestHandler(req, res) {
     pathname = '/';
   }
   if (pathname === EXTERNAL_MEDIA_ROUTE && requestUrl) {
-    let requestedPath = '';
-    try {
-      requestedPath = decodeRequestComponent(requestUrl.searchParams.get('path') || '');
-    } catch (error) {
-      if (!(error instanceof MalformedRequestEncodingError)) throw error;
-      writeBadRequest(res);
-      return;
-    }
+    // searchParams already percent-decodes; decoding again breaks names with "%".
+    const requestedPath = requestUrl.searchParams.get('path') || '';
     if (!requestedPath || !isAllowedExternalMediaPath(requestedPath)) {
       res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('Forbidden');
@@ -693,6 +700,8 @@ function isExplicitlyAllowedExternalMediaPath(filePath = '') {
 }
 
 function isAllowedExternalMediaPath(filePath) {
+  // Renderer IPC can add paths and watch roots, so serve media files only.
+  if (!isMediaFilePath(filePath)) return false;
   if (isExplicitlyAllowedExternalMediaPath(filePath)) return true;
   return watchRoots.some((root) => isWithinRoot(filePath, root.path));
 }
@@ -963,17 +972,42 @@ async function fetchApprovedRemoteJson(payload = {}) {
   }
 }
 
-function isTrustedRendererSender(event) {
-  let senderUrl = '';
+function isLocalAppUrl(rawUrl = '') {
   try {
-    senderUrl = String(event?.senderFrame?.url || event?.sender?.getURL?.() || '');
-    const parsed = new URL(senderUrl);
+    const parsed = new URL(String(rawUrl || ''));
     return parsed.protocol === 'http:'
       && parsed.hostname === HOST
       && parsed.port === String(localPort || FIXED_PORT);
   } catch (_) {
     return false;
   }
+}
+
+function isTrustedRendererSender(event) {
+  return isLocalAppUrl(event?.senderFrame?.url || event?.sender?.getURL?.() || '');
+}
+
+function openInSystemBrowser(rawUrl = '') {
+  try {
+    const parsed = new URL(String(rawUrl || ''));
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+      shell.openExternal(parsed.toString()).catch(() => {});
+    }
+  } catch (_) {}
+}
+
+// External pages belong in the user's browser, which shows the address and
+// keeps their sign-ins out of NexPlay's session.
+function restrictWindowNavigation(contents) {
+  contents.setWindowOpenHandler(({ url }) => {
+    if (!isLocalAppUrl(url)) openInSystemBrowser(url);
+    return { action: 'deny' };
+  });
+  contents.on('will-navigate', (event, url) => {
+    if (isLocalAppUrl(url)) return;
+    event.preventDefault();
+    openInSystemBrowser(url);
+  });
 }
 
 function registerTrustedIpcHandler(channel, handler) {
@@ -1414,7 +1448,8 @@ async function runYtDlpDownload({ request, outputTemplate, ffmpegLocation, sourc
   if (ffmpegLocation) {
     args.push('--ffmpeg-location', ffmpegLocation);
   }
-  args.push(sourceUrl);
+  // The URL comes from the renderer; '--' stops yt-dlp reading it as an option.
+  args.push('--', sourceUrl);
 
   let lastPhase = '';
   let lastPercent = -1;
@@ -2306,6 +2341,7 @@ async function resolveOnlineTrackAudioStream(rawPayload = {}) {
     '--no-playlist',
     '--dump-single-json',
     '--format', 'bestaudio[ext=m4a]/bestaudio/best',
+    '--',
     sourceUrl
   ], {
     timeoutMs,
@@ -2738,6 +2774,7 @@ async function createWindow() {
       preload: PRELOAD_PATH
     }
   });
+  restrictWindowNavigation(win.webContents);
   const version = encodeURIComponent(app.getVersion());
   win.loadURL(`http://${HOST}:${port}/?nexplay_desktop_version=${version}`);
 }

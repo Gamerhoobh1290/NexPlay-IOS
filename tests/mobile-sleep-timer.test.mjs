@@ -27,11 +27,14 @@ function extractFunction(name) {
     throw new Error(`Could not find the end of ${name}`);
 }
 
-/** Build an isolated scope holding the real setSleepTimer and its helper. */
+/**
+ * Build an isolated scope holding the real setSleepTimer and its helper.
+ * @param {{ sleepLabel?: { textContent: string } | null, pauseTransport?: () => void }} [options]
+ */
 function loadSleepTimer({ sleepLabel = null, pauseTransport } = {}) {
     const state = { sleepTimer: null, sleepTimerEndsAt: 0, sleepTimerMinutes: 0, isPlaying: true, activeTab: 'settings' };
     const els = { sleepLabel, audio: { paused: false, pause() { this.paused = true; } } };
-    const calls = { pause: 0, updatePlayIcons: 0, toasts: [], renders: 0, wakeLockSyncs: 0 };
+    const calls = { pause: 0, updatePlayIcons: 0, toasts: /** @type {string[]} */ ([]), renders: 0, wakeLockSyncs: 0 };
 
     const factory = new Function(
         'state', 'els', 'document', 'showToast', 'updatePlayIcons',
@@ -46,7 +49,7 @@ function loadSleepTimer({ sleepLabel = null, pauseTransport } = {}) {
         state,
         els,
         { getElementById: () => null },
-        (message) => calls.toasts.push(message),
+        (/** @type {string} */ message) => calls.toasts.push(message),
         () => { calls.updatePlayIcons += 1; },
         () => { calls.renders += 1; },
         pauseTransport === undefined

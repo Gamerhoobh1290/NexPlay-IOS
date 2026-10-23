@@ -1,6 +1,6 @@
 {
   "name": "nexplay-next",
-  "version": "2.2.1",
+  "version": "2.2.3",
   "description": "NexPlay desktop application",
   "author": "NexPlay",
   "private": true,
@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@types/node": "24.13.3",
-    "electron": "43.1.1",
+    "electron": "43.7.9",
     "electron-builder": "26.15.3",
     "postcss": "8.5.10",
     "tailwindcss": "3.4.17",
@@ -36,7 +36,7 @@
   "build": {
     "appId": "com.nexplay.app",
     "productName": "NexPlay",
-    "buildVersion": "2.2.1.0",
+    "buildVersion": "2.2.3.0",
     "files": [
       "index.html",
       "NexPlay.html",

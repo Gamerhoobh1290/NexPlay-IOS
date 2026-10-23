@@ -334,6 +334,7 @@
 	                finishSourceLoad(sourceLoadRequestId);
 	            }
 	            normalizeRuntimeState({ allowStopWhenQueueEmpty: false });
+	            renderMiniQueuePeek();
 	            logAction('source-switch-finish', 'Track switch finished', {
 	                trackId: sanitizeText(track.id || ''),
 	                source: sanitizeText(track.source || 'local'),

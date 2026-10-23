@@ -45,6 +45,11 @@ function setSleepTimer(min) {
     els.sleepLabel.textContent = min === 0 ? 'Sleep' : `${min}m`;
     if(min > 0) {
         state.sleepTimer = setTimeout(() => {
+            // Online music may be playing in the YouTube iframe, which pausing
+            // the local element does not stop.
+            if (isOnlineMusicPlaybackActive() && getOnlineMusicState().isPlaying) {
+                toggleOnlineMusicPlayback();
+            }
             safePauseMedia(els.audio);
             state.isPlaying = false;
             updatePlayIcons();
@@ -1887,6 +1892,7 @@ function renderSettingsTab() {
     `;
     applyFeatureVisibility();
     refreshLucideIcons();
+    window.NexPlaySettingHelp?.align(els.tracksContainer);
 }
 
 function setEmptyStateVariant(variant, config = {}) {

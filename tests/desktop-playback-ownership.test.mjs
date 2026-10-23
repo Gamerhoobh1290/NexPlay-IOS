@@ -304,6 +304,38 @@ test('safePlayMedia rejects stale context even when the shared media element is 
     assert.equal(playCalls, 0);
 });
 
+test('safePlayMedia plays a newly assigned source before currentSrc catches up', async () => {
+    // Assigning media.src updates src at once, but currentSrc keeps the previous
+    // track's URL until the browser's asynchronous resource selection runs.
+    const state = { currentTrackId: 'track-b', currentPlaybackSource: 'local' };
+    const context = createRuntimeCoordinatorContext({
+        state,
+        hasPlayableSource: () => true,
+        waitForMediaReady: async () => true
+    });
+    const mediaFunctions = sliceRequired(runtimeSource, 'async function safePlayMedia', 'function safeSeekMedia');
+    vm.runInContext(`${mediaFunctions}; globalThis.mediaApi = { safePlayMedia, safePauseMedia };`, context);
+
+    const intent = context.intentApi.beginPlaybackIntent('track-b', 'local');
+    let playCalls = 0;
+    const media = {
+        paused: true,
+        src: 'http://localhost:5000/b.mp3',
+        currentSrc: 'http://localhost:5000/a.mp3',
+        play: async () => { playCalls += 1; },
+        pause() {}
+    };
+
+    assert.equal(await context.mediaApi.safePlayMedia(media, {
+        waitForReady: true,
+        playbackIntent: intent,
+        expectedTrackId: 'track-b',
+        expectedPlaybackSource: 'local',
+        expectedMediaSource: 'http://localhost:5000/b.mp3'
+    }), true);
+    assert.equal(playCalls, 1);
+});
+
 test('transport ownership cannot move from direct audio back to iframe in the same session', () => {
     const online = { sessionId: 7 };
     const context = createRuntimeCoordinatorContext({
