@@ -94,6 +94,7 @@ async function saveEdit() {
             updateTrackUI(track);
             if (isCurrentLibraryTrack(track)) applyCoverAccent(track);
             renderTracks({ preserveScroll: true });
+            renderMiniQueuePeek();
             if (state.activeTab === 'online-music') renderOnlineMusicContent();
         } catch (err) {
             console.error(err);

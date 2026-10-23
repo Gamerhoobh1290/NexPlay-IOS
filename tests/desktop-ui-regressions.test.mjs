@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import vm from 'node:vm';
 
 const css = fs.readFileSync(new URL('../css/components.css', import.meta.url), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '');
@@ -195,6 +196,56 @@ test('the sidebar nav can scroll its last item clear of the floating player wher
     assert.ok(block, 'sidebar nav needs extra bottom padding while the player overlaps it');
     // Default padding is 1.5rem and the player reaches ~35px (2.2rem) into the nav.
     assert.ok(Number(block[1]) >= 4, `padding ${block[1]}rem does not clear the player`);
+});
+
+test('the mini player "Next:" line stays one quiet line under the progress bar', () => {
+    const peek = html.match(/<div id="mini-queue-peek" class="([^"]*)"><\/div>/);
+    assert.ok(peek, 'mini-queue-peek markup should exist');
+    const classes = peek[1].split(/\s+/);
+    assert.ok(classes.includes('hidden'), 'stays hidden until the queue renders it');
+    assert.ok(classes.includes('truncate'), 'long titles must truncate instead of wrapping the dock taller');
+    // Same voice as the artist and time labels around it, not louder than the track title.
+    for (const name of ['text-[10px]', 'font-mono', 'text-gray-500']) {
+        assert.ok(classes.includes(name), `mini-queue-peek should use ${name}`);
+    }
+});
+
+test('saving edited metadata refreshes the mini player "Next:" line', async () => {
+    const modesSource = fs.readFileSync(new URL('../js/legacy/modals-and-modes.js', import.meta.url), 'utf8');
+    const start = modesSource.indexOf('async function saveEdit(');
+    const end = modesSource.indexOf('function optimizeCoverDataUrl(', start);
+    assert.notEqual(start, -1);
+    assert.notEqual(end, -1);
+    /** @type {Record<string, any>} */
+    const fields = {
+        'edit-title': { value: 'Renamed Track' },
+        'edit-artist': { value: 'Artist' },
+        'edit-tags': { value: '' },
+        'edit-cover': { files: [] }
+    };
+    const calls = { peek: 0 };
+    const noop = () => {};
+    const context = vm.createContext({
+        state: { editingTrackId: 'next', tracks: [{ id: 'next', title: 'Old Title', artist: 'Artist', source: 'local' }], activeTab: 'all' },
+        document: { getElementById: (/** @type {string} */ id) => fields[id] || null },
+        sanitizeText: (/** @type {string} */ value) => String(value || '').trim(),
+        isOnlineMusicTrackRecord: () => false,
+        isCurrentLibraryTrack: () => false,
+        persistTrackMetadata: noop,
+        updateTrackUI: noop,
+        applyCoverAccent: noop,
+        renderTracks: noop,
+        renderOnlineMusicContent: noop,
+        showToast: noop,
+        persistAppStateNow: noop,
+        closeEditModal: noop,
+        console,
+        renderMiniQueuePeek: () => { calls.peek += 1; }
+    });
+    new vm.Script(`${modesSource.slice(start, end)}\nglobalThis.__saveEdit = saveEdit;`).runInContext(context);
+    await context.__saveEdit();
+    assert.equal(context.state.tracks[0].title, 'Renamed Track');
+    assert.equal(calls.peek, 1, 'the queued title shown as "Next:" must not go stale');
 });
 
 test('narrow library list rows keep a readable title column instead of collapsing it', () => {
