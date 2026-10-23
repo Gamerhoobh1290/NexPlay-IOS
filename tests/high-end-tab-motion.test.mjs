@@ -409,17 +409,17 @@ test('tab entrance CSS is strictly High End, adaptive-safe, and compositor-only'
     assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*animation-duration: 0\.001ms !important/);
 });
 
-test('Windows updater release uses 2.2.2.0 without invalidating npm SemVer', () => {
+test('Windows updater release uses 2.2.3.0 without invalidating npm SemVer', () => {
     const packageJson = JSON.parse(read('package.json'));
     const packageLock = JSON.parse(read('package-lock.json'));
     const updaterProject = read('tools/NexPlayUpdaterExe/NexPlayUpdaterExe.csproj');
     const releaseScript = read('scripts/Create-NexPlayUpdatePackage.ps1');
-    assert.equal(packageJson.version, '2.2.2');
-    assert.equal(packageJson.build.buildVersion, '2.2.2.0');
-    assert.equal(packageLock.version, '2.2.2');
-    assert.equal(packageLock.packages[''].version, '2.2.2');
+    assert.equal(packageJson.version, '2.2.3');
+    assert.equal(packageJson.build.buildVersion, '2.2.3.0');
+    assert.equal(packageLock.version, '2.2.3');
+    assert.equal(packageLock.packages[''].version, '2.2.3');
     for (const field of ['Version', 'InformationalVersion', 'AssemblyVersion', 'FileVersion']) {
-        assert.match(updaterProject, new RegExp(`<${field}>2\\.2\\.2\\.0<\\/${field}>`));
+        assert.match(updaterProject, new RegExp(`<${field}>2\\.2\\.3\\.0<\\/${field}>`));
     }
     assert.match(releaseScript, /\$BuildVersion = if \(\$PackageJson\.build -and \$PackageJson\.build\.buildVersion\)/);
     assert.match(releaseScript, /\$Version = if \(\[string\]::IsNullOrWhiteSpace\(\$BuildVersion\)\)[\s\S]*\$BuildVersion/);

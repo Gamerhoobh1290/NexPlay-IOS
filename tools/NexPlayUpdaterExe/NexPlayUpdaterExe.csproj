@@ -9,10 +9,10 @@
     <RootNamespace>NexPlayUpdater</RootNamespace>
     <ApplicationIcon>..\..\NexPlay_N_final_256.ico</ApplicationIcon>
     <Product>NexPlay Updater</Product>
-    <Version>2.2.2.0</Version>
-    <InformationalVersion>2.2.2.0</InformationalVersion>
-    <AssemblyVersion>2.2.2.0</AssemblyVersion>
-    <FileVersion>2.2.2.0</FileVersion>
+    <Version>2.2.3.0</Version>
+    <InformationalVersion>2.2.3.0</InformationalVersion>
+    <AssemblyVersion>2.2.3.0</AssemblyVersion>
+    <FileVersion>2.2.3.0</FileVersion>
     <TargetPlatformMoniker>Windows,Version=7.0</TargetPlatformMoniker>
     <TargetPlatformDisplayName>Windows 7</TargetPlatformDisplayName>
   </PropertyGroup>
