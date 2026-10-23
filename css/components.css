@@ -2581,6 +2581,16 @@ button.music-games-piano-key {
 }
 
 
+/* Between the static sidebar appearing (1024px) and the centered player clearing it
+   (1632px), the player covers the bottom of the sidebar nav. Let the nav scroll its
+   last item up past the player. */
+@media (min-width: 1024px) and (max-width: 1631px) {
+    #sidebar > .overflow-y-auto {
+        padding-bottom: 5rem;
+    }
+}
+
+
 
 #mini-player,
 #mini-player > * {

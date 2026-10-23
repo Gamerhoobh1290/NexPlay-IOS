@@ -188,6 +188,15 @@ test('settings help tooltips near the right edge open leftwards instead of overf
     assert.match(settingsSource, /refreshLucideIcons\(\);\s*window\.NexPlaySettingHelp\?\.align\(els\.tracksContainer\);\s*\}/);
 });
 
+test('the sidebar nav can scroll its last item clear of the floating player where they overlap', () => {
+    const flat = css.replace(/\s+/g, ' ');
+    // The static sidebar appears at 1024px; the 64rem player stops reaching it at 1632px.
+    const block = flat.match(/@media \(min-width: 1024px\) and \(max-width: 1631px\) \{ #sidebar > \.overflow-y-auto \{ padding-bottom: (\d+(?:\.\d+)?)rem; \} \}/);
+    assert.ok(block, 'sidebar nav needs extra bottom padding while the player overlaps it');
+    // Default padding is 1.5rem and the player reaches ~35px (2.2rem) into the nav.
+    assert.ok(Number(block[1]) >= 4, `padding ${block[1]}rem does not clear the player`);
+});
+
 test('narrow library list rows keep a readable title column instead of collapsing it', () => {
     const row = declarationsFor(/^\.library-track-item\[data-view="list"\]$/);
     assert.match(row, /flex-wrap:\s*wrap/, 'actions should be able to drop below the title');
