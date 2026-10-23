@@ -811,12 +811,9 @@ function setVisualizerStyle(style) {
 }
 
 // --- SHORTCUTS SETTINGS ---
-let shortcutsModalReturnFocus = null;
-
 function openShortcutsModal() {
     const modal = document.getElementById('shortcuts-modal');
     if (!modal) return;
-    shortcutsModalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const list = document.getElementById('shortcuts-list');
     if (list) {
         list.innerHTML = '';
@@ -847,11 +844,6 @@ function openShortcutsModal() {
     inputs.forEach(input => {
         input.addEventListener('keydown', (ev) => {
             if (ev.key === 'Tab') return;
-            if (ev.key === 'Escape') {
-                ev.preventDefault();
-                closeShortcutsModal();
-                return;
-            }
             ev.preventDefault();
             // Use event.code to store the physical key (e.g., "KeyM", "ArrowUp")
             input.value = ev.code;
@@ -859,7 +851,7 @@ function openShortcutsModal() {
     });
     modal.classList.remove('hidden');
     modal.classList.add('flex');
-    window.requestAnimationFrame(() => inputs[0]?.focus());
+    window.NexPlayDialogs?.openDialog(document.getElementById('shortcuts-modal'), { onEscape: closeShortcutsModal });
 }
 function closeShortcutsModal() {
     const modal = document.getElementById('shortcuts-modal');
@@ -867,8 +859,7 @@ function closeShortcutsModal() {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     }
-    if (shortcutsModalReturnFocus?.isConnected) shortcutsModalReturnFocus.focus();
-    shortcutsModalReturnFocus = null;
+    window.NexPlayDialogs?.closeDialog(document.getElementById('shortcuts-modal'));
 }
 function saveShortcuts() {
     // Iterate over inputs and update keyBindings

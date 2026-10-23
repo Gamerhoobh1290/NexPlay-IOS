@@ -26,6 +26,7 @@ const CORE_ASSETS = [
     './js/ui/layout.js',
     './js/ui/theme.js',
     './js/ui/toast.js',
+    './js/ui/dialog-focus.js',
     './js/features/player.js',
     './js/features/sidebar.js',
     './js/features/queue.js',

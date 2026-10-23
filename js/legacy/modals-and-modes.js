@@ -30,6 +30,7 @@ function openEditModal(id) {
         modal.classList.remove('hidden');
         modal.classList.add('flex');
     }
+    window.NexPlayDialogs?.openDialog(document.getElementById('edit-modal'), { onEscape: closeEditModal, initialFocus: '#edit-title' });
     // Render icons within the modal
     if (typeof lucide !== 'undefined') {
         refreshLucideIcons();
@@ -41,6 +42,7 @@ function closeEditModal() {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     }
+    window.NexPlayDialogs?.closeDialog(document.getElementById('edit-modal'));
     state.editingTrackId = null;
 }
 async function saveEdit() {
@@ -202,6 +204,7 @@ function confirmDeleteTrack(e, ids) {
     if (labelEl) labelEl.textContent = `Remove ${label}? You can undo this immediately.`;
     modal.classList.remove('hidden');
     modal.classList.add('flex');
+    window.NexPlayDialogs?.openDialog(document.getElementById('delete-confirm-modal'), { onEscape: closeDeleteConfirm });
 }
 
 function closeDeleteConfirm() {
@@ -210,6 +213,7 @@ function closeDeleteConfirm() {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     }
+    window.NexPlayDialogs?.closeDialog(document.getElementById('delete-confirm-modal'));
     state.pendingDeleteTrack = null;
 }
 

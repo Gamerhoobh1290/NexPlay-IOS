@@ -1079,6 +1079,7 @@ function openPlaylistModal(trackId = null) {
         modal.classList.remove('hidden');
         modal.classList.add('flex');
     }
+    window.NexPlayDialogs?.openDialog(document.getElementById('playlist-modal'), { onEscape: closePlaylistModal });
 }
 
 function closePlaylistModal() {
@@ -1087,6 +1088,7 @@ function closePlaylistModal() {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     }
+    window.NexPlayDialogs?.closeDialog(document.getElementById('playlist-modal'));
     const newInput = document.getElementById('playlist-new-name');
     if (newInput) newInput.value = '';
     state.pendingPlaylistTrackId = null;

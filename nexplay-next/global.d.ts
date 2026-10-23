@@ -11,6 +11,7 @@ interface Window {
   NexPlayNext?: any;
   NexPlayOps?: any;
   NexPlaySecurity?: any;
+  NexPlayDialogs?: any;
   showToast?: (message: string, type?: string) => void;
   fetchItunes?: (...args: any[]) => any;
   fetchDeezer?: (...args: any[]) => any;
