@@ -265,6 +265,21 @@ test('the standby mini player starts with its empty cover hidden, not a broken i
     assert.match(cover[0], /class="[^"]*\bhidden\b/, 'an empty src must not render as a broken image');
 });
 
+test('grid cards are never narrower than their five hover actions', () => {
+    // The hover bar holds five p-2.5 buttons with w-5 icons (40px each) and gap-2, and
+    // sits 0.75rem in from the card edge. Breakpoint columns (lg:grid-cols-5) squeezed
+    // cards to 105-207px beside the sidebar, pushing the bar out of the clipped card.
+    const renderingSource = fs.readFileSync(new URL('../js/legacy/rendering.js', import.meta.url), 'utf8');
+    assert.match(renderingSource, /state\.viewMode === 'grid' \? 'grid library-grid gap-6'/);
+    assert.doesNotMatch(renderingSource, /lg:grid-cols-5 gap-6/);
+
+    const columns = declarationsFor(/^\.library-grid$/).match(/grid-template-columns:\s*repeat\(auto-fill,\s*minmax\((\d+(?:\.\d+)?)rem,\s*1fr\)\)/);
+    assert.ok(columns, 'grid view should fill columns by available width');
+    const barWidthPx = 5 * 40 + 4 * 8;
+    const minimumCardPx = barWidthPx + 2 * 12;
+    assert.ok(Number(columns[1]) * 16 >= minimumCardPx, `cards of ${columns[1]}rem cannot hold the ${barWidthPx}px action bar`);
+});
+
 test('narrow library list rows keep a readable title column instead of collapsing it', () => {
     const row = declarationsFor(/^\.library-track-item\[data-view="list"\]$/);
     assert.match(row, /flex-wrap:\s*wrap/, 'actions should be able to drop below the title');

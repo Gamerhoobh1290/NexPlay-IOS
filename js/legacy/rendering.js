@@ -155,7 +155,7 @@ function renderTracks(opts = {}) {
     emptyEl.classList.add('hidden');
     emptyEl.classList.remove('flex');
 
-    container.className = state.viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6' : 'flex flex-col gap-3';
+    container.className = state.viewMode === 'grid' ? 'grid library-grid gap-6' : 'flex flex-col gap-3';
 
 	            const selectedSet = new Set(state.selectedTrackIds || []);
             const performanceTier = getEffectivePerformanceTier();

@@ -1695,6 +1695,13 @@ body[data-density="compact"] #settings-page .holo-panel {
     margin-left: auto;
 }
 
+/* Grid cards hold a 232px hover action bar inset 0.75rem from their edge, so columns
+   come from the space available (the sidebar takes some from 1024px up) rather than
+   from viewport breakpoints, and a card never gets narrower than that bar. */
+.library-grid {
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+}
+
 
 	        .track-active {
 	            background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent);
