@@ -736,6 +736,9 @@ internal sealed class BrandMark : Control
 {
     public BrandMark()
     {
+        // Decoration only: keep it out of the Tab order.
+        SetStyle(ControlStyles.Selectable, false);
+        TabStop = false;
         DoubleBuffered = true;
         ResizeRedraw = true;
         BackColor = Color.FromArgb(4, 5, 8);
@@ -785,6 +788,9 @@ internal sealed class AccentStrip : Control
 {
     public AccentStrip()
     {
+        // Decoration only: keep it out of the Tab order.
+        SetStyle(ControlStyles.Selectable, false);
+        TabStop = false;
         DoubleBuffered = true;
         ResizeRedraw = true;
     }

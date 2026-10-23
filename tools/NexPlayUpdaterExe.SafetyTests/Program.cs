@@ -34,7 +34,8 @@ internal static class SafetyTestProgram
             InstalledVersionPrefersExecutableThenReceipt,
             RegistryRefreshUpdatesUninstallEntryVersion,
             DetailsToggleGrowsWindowAtEveryDpiScale,
-            EscapeChoosesTheDismissingButton
+            EscapeChoosesTheDismissingButton,
+            DecorationIsNotATabStop
         };
 
         try
@@ -580,6 +581,18 @@ internal static class SafetyTestProgram
             True(PressEscape(window), "Escape was not handled on a message screen");
             PumpUntil(() => message.IsCompleted, "message dismissal");
 
+            CloseWindow(window);
+        });
+    }
+
+    private static void DecorationIsNotATabStop()
+    {
+        RunOnSta(() =>
+        {
+            using var window = OpenOffscreenWindow();
+            var decorations = window.Controls.Cast<Control>().Where(control => control is AccentStrip or BrandMark).ToList();
+            Equal(2, decorations.Count, "decorative controls found");
+            True(decorations.All(control => !control.CanSelect), "the accent strip or logo can take keyboard focus");
             CloseWindow(window);
         });
     }
