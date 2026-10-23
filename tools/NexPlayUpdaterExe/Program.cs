@@ -517,6 +517,8 @@ internal sealed class UpdaterWindow : Form, IUpdaterUi
             }
 
             AcceptButton = _primaryButton;
+            // Escape dismisses like the title-bar X: the negative choice, or Close.
+            CancelButton = _secondaryAction is not null ? _secondaryButton : _primaryButton;
             _primaryButton.Focus();
         });
 
@@ -529,6 +531,7 @@ internal sealed class UpdaterWindow : Form, IUpdaterUi
             _primaryAction = null;
             _secondaryAction = null;
             AcceptButton = null;
+            CancelButton = null;
         });
 
         return result;

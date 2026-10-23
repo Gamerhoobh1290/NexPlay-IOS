@@ -33,7 +33,8 @@ internal static class SafetyTestProgram
             DownloadProgressIsDescribedForPeople,
             InstalledVersionPrefersExecutableThenReceipt,
             RegistryRefreshUpdatesUninstallEntryVersion,
-            DetailsToggleGrowsWindowAtEveryDpiScale
+            DetailsToggleGrowsWindowAtEveryDpiScale,
+            EscapeChoosesTheDismissingButton
         };
 
         try
@@ -562,6 +563,27 @@ internal static class SafetyTestProgram
         });
     }
 
+    private static void EscapeChoosesTheDismissingButton()
+    {
+        RunOnSta(() =>
+        {
+            using var window = OpenOffscreenWindow();
+
+            var confirm = Task.Run(() => window.Confirm("Download update?", "detail", "Download and install", "Not now", 30));
+            PumpUntil(() => Field<Button>(window, "_secondaryButton").Visible, "confirm buttons");
+            True(PressEscape(window), "Escape was not handled on the confirm screen");
+            PumpUntil(() => confirm.IsCompleted, "confirm result");
+            Equal(false, confirm.Result, "Escape on the confirm screen means Not now");
+
+            var message = Task.Run(() => window.MessageAndWait("NexPlay is up to date", "detail", false));
+            PumpUntil(() => Field<Button>(window, "_primaryButton").Visible, "message button");
+            True(PressEscape(window), "Escape was not handled on a message screen");
+            PumpUntil(() => message.IsCompleted, "message dismissal");
+
+            CloseWindow(window);
+        });
+    }
+
     private static void RunOnSta(Action action)
     {
         Exception? failure = null;
@@ -595,6 +617,23 @@ internal static class SafetyTestProgram
     {
         SetField(window, "_canClose", true);
         window.Close();
+    }
+
+    private static bool PressEscape(Form window)
+    {
+        var processDialogKey = typeof(Form).GetMethod("ProcessDialogKey", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        return (bool)processDialogKey.Invoke(window, new object[] { Keys.Escape })!;
+    }
+
+    private static void PumpUntil(Func<bool> condition, string waitingFor)
+    {
+        var clock = Stopwatch.StartNew();
+        while (!condition())
+        {
+            if (clock.Elapsed > TimeSpan.FromSeconds(5)) throw new InvalidOperationException($"timed out waiting for {waitingFor}");
+            Application.DoEvents();
+            Thread.Sleep(10);
+        }
     }
 
     private static T Field<T>(object target, string name)
