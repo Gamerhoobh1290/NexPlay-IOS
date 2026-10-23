@@ -256,6 +256,15 @@ test('switching tracks re-renders the "Next:" line from the newly current track'
     assert.match(playerSource, /normalizeRuntimeState\(\{ allowStopWhenQueueEmpty: false \}\);\s*renderMiniQueuePeek\(\);\s*logAction\('source-switch-finish'/);
 });
 
+test('the standby mini player starts with its empty cover hidden, not a broken image', () => {
+    // The markup ships "Standby / NexPlay OS" with no cover yet; every runtime path that
+    // clears the cover (resetMusicGamePlayerShell, updateTrackUI) also hides the image.
+    const cover = html.match(/<img id="mini-cover"[^>]*>/);
+    assert.ok(cover, 'mini-cover markup should exist');
+    assert.match(cover[0], /src=""/);
+    assert.match(cover[0], /class="[^"]*\bhidden\b/, 'an empty src must not render as a broken image');
+});
+
 test('narrow library list rows keep a readable title column instead of collapsing it', () => {
     const row = declarationsFor(/^\.library-track-item\[data-view="list"\]$/);
     assert.match(row, /flex-wrap:\s*wrap/, 'actions should be able to drop below the title');
