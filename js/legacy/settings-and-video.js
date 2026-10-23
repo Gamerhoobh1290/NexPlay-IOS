@@ -1892,6 +1892,7 @@ function renderSettingsTab() {
     `;
     applyFeatureVisibility();
     refreshLucideIcons();
+    window.NexPlaySettingHelp?.align(els.tracksContainer);
 }
 
 function setEmptyStateVariant(variant, config = {}) {

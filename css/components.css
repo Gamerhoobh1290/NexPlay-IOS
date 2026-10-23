@@ -1092,6 +1092,14 @@ body[data-density="compact"] #settings-page .holo-panel {
 }
 
 
+.setting-help-tooltip.align-end,
+.setting-help-tooltip.align-center.align-end {
+    left: auto;
+    right: 0;
+    transform: translateY(8px);
+}
+
+
 .setting-help-trigger:hover .setting-help-tooltip,
 .setting-help-trigger:focus-visible .setting-help-tooltip {
     opacity: 1;
@@ -1102,6 +1110,12 @@ body[data-density="compact"] #settings-page .holo-panel {
 .setting-help-trigger:hover .setting-help-tooltip.align-center,
 .setting-help-trigger:focus-visible .setting-help-tooltip.align-center {
     transform: translate(-50%, 0);
+}
+
+
+.setting-help-trigger:hover .setting-help-tooltip.align-center.align-end,
+.setting-help-trigger:focus-visible .setting-help-tooltip.align-center.align-end {
+    transform: translateY(0);
 }
 
 

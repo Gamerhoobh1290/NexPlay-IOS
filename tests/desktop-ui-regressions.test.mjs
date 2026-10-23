@@ -128,6 +128,66 @@ test('every legacy modal is a labelled dialog wired to the shared focus helper',
     assert.match(app, /\['ui\/dialog-focus', initDialogFocus\]/);
 });
 
+test('settings help tooltips near the right edge open leftwards instead of overflowing', async () => {
+    /**
+     * @param {number} triggerLeft
+     * @param {number} width
+     * @param {{ centered?: boolean }} [options]
+     */
+    function createTooltip(triggerLeft, width, { centered = false } = {}) {
+        const classes = new Set(['setting-help-tooltip']);
+        if (centered) classes.add('align-center');
+        const triggerRect = { left: triggerLeft, right: triggerLeft + 16 };
+        const startLeft = centered ? triggerLeft + 8 - width / 2 : triggerLeft;
+        return {
+            classList: {
+                /** @param {string} name */
+                add(name) { classes.add(name); },
+                /** @param {string} name */
+                remove(name) { classes.delete(name); },
+                /** @param {string} name */
+                contains(name) { return classes.has(name); }
+            },
+            parentElement: { getBoundingClientRect: () => triggerRect },
+            getBoundingClientRect() {
+                const left = classes.has('align-end') ? triggerRect.right - width : startLeft;
+                return { left, right: left + width, width };
+            }
+        };
+    }
+    const scroller = { clientLeft: 0, clientWidth: 1084, getBoundingClientRect: () => ({ left: 320 }) };
+    const fits = createTooltip(400, 304);
+    const overflows = createTooltip(1278, 304);
+    const staleFlip = createTooltip(500, 304);
+    staleFlip.classList.add('align-end');
+    const centeredOverflow = createTooltip(1300, 256, { centered: true });
+    const root = {
+        /** @param {string} selector */
+        querySelectorAll(selector) {
+            return [fits, overflows, staleFlip, centeredOverflow].filter((tooltip) =>
+                !(selector.includes(':not(.align-center)') && tooltip.classList.contains('align-center')));
+        }
+    };
+    Object.assign(globalThis, {
+        document: { getElementById: (/** @type {string} */ id) => (id === 'main-scroll-area' ? scroller : null) }
+    });
+
+    const { alignSettingHelpTooltips } = await import('../js/ui/setting-help-tooltips.js');
+    alignSettingHelpTooltips(root);
+
+    assert.equal(fits.classList.contains('align-end'), false);
+    assert.equal(overflows.classList.contains('align-end'), true, 'a tooltip past the right edge flips');
+    assert.ok(overflows.getBoundingClientRect().right <= 320 + 1084);
+    assert.equal(staleFlip.classList.contains('align-end'), false, 'a flip is dropped once the tooltip fits again');
+    assert.equal(centeredOverflow.classList.contains('align-end'), true, 'centered tooltips flip too');
+
+    const flat = css.replace(/\s+/g, ' ');
+    assert.match(flat, /\.setting-help-tooltip\.align-end, \.setting-help-tooltip\.align-center\.align-end \{ left: auto; right: 0; transform: translateY\(8px\); \}/);
+    assert.match(flat, /\.setting-help-trigger:hover \.setting-help-tooltip\.align-center\.align-end, \.setting-help-trigger:focus-visible \.setting-help-tooltip\.align-center\.align-end \{ transform: translateY\(0\); \}/);
+    const settingsSource = fs.readFileSync(new URL('../js/legacy/settings-and-video.js', import.meta.url), 'utf8');
+    assert.match(settingsSource, /refreshLucideIcons\(\);\s*window\.NexPlaySettingHelp\?\.align\(els\.tracksContainer\);\s*\}/);
+});
+
 test('narrow library list rows keep a readable title column instead of collapsing it', () => {
     const row = declarationsFor(/^\.library-track-item\[data-view="list"\]$/);
     assert.match(row, /flex-wrap:\s*wrap/, 'actions should be able to drop below the title');
