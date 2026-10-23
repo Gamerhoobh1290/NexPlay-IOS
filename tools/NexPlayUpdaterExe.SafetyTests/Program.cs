@@ -32,7 +32,8 @@ internal static class SafetyTestProgram
             DownloadReportsProgressToCompletion,
             DownloadProgressIsDescribedForPeople,
             InstalledVersionPrefersExecutableThenReceipt,
-            RegistryRefreshUpdatesUninstallEntryVersion
+            RegistryRefreshUpdatesUninstallEntryVersion,
+            DetailsToggleGrowsWindowAtEveryDpiScale
         };
 
         try
@@ -533,6 +534,82 @@ internal static class SafetyTestProgram
         {
             Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(@"Software\NexPlayUpdaterSafetyTests", throwOnMissingSubKey: false);
         }
+    }
+
+    private static void DetailsToggleGrowsWindowAtEveryDpiScale()
+    {
+        RunOnSta(() =>
+        {
+            foreach (var scale in new[] { 1F, 1.25F, 1.5F, 1.75F })
+            {
+                // Shown, because ToggleDetails reads the log's Visible state.
+                using var window = OpenOffscreenWindow();
+                // AutoScaleMode.Dpi applies exactly this scaling at 120, 144 and 168 DPI.
+                window.Scale(new SizeF(scale, scale));
+                var collapsed = window.ClientSize.Height;
+
+                InvokeInstance(window, "ToggleDetails");
+                var expanded = window.ClientSize.Height;
+                True(expanded > collapsed, $"Show details shrank the window at {scale:P0}: {collapsed} -> {expanded}");
+                Equal((int)Math.Round(collapsed * 728d / 548d), expanded, $"expanded height at {scale:P0}");
+                var log = Field<TextBox>(window, "_log");
+                True(log.Height > 0 && log.Bottom <= Field<Button>(window, "_primaryButton").Top, $"details log does not fit above the buttons at {scale:P0}");
+
+                InvokeInstance(window, "ToggleDetails");
+                Equal(collapsed, window.ClientSize.Height, $"collapsed height restored at {scale:P0}");
+                CloseWindow(window);
+            }
+        });
+    }
+
+    private static void RunOnSta(Action action)
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try { action(); }
+            catch (Exception ex) { failure = ex; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) throw new InvalidOperationException(failure.Message, failure);
+    }
+
+    private static UpdaterWindow OpenOffscreenWindow()
+    {
+        var window = new UpdaterWindow(Array.Empty<string>())
+        {
+            StartPosition = FormStartPosition.Manual,
+            Location = new Point(-32000, -32000),
+            ShowInTaskbar = false
+        };
+        // Pretend the update run already started so showing the window does not launch one.
+        SetField(window, "_runStarted", true);
+        window.Show();
+        Application.DoEvents();
+        return window;
+    }
+
+    private static void CloseWindow(UpdaterWindow window)
+    {
+        SetField(window, "_canClose", true);
+        window.Close();
+    }
+
+    private static T Field<T>(object target, string name)
+    {
+        return (T)target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(target)!;
+    }
+
+    private static void SetField(object target, string name, object value)
+    {
+        target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(target, value);
+    }
+
+    private static void InvokeInstance(object target, string name)
+    {
+        target.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(target, null);
     }
 
     private static void ExpectUpdaterFailure(string methodName, params object?[] arguments)

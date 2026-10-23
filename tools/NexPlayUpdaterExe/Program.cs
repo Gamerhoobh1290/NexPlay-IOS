@@ -103,6 +103,7 @@ internal sealed class UpdaterWindow : Form, IUpdaterUi
     private Action? _primaryAction;
     private Action? _secondaryAction;
     private int _currentProgress;
+    private int _collapsedClientHeight;
     private UiState _state = UiState.Working;
     private string _lastLoggedTitle = string.Empty;
     private bool _runStarted;
@@ -606,7 +607,18 @@ internal sealed class UpdaterWindow : Form, IUpdaterUi
     private void ToggleDetails()
     {
         var expand = !_log.Visible;
-        ClientSize = new Size(ClientSize.Width, expand ? ExpandedHeight : CollapsedHeight);
+        if (expand)
+        {
+            _collapsedClientHeight = ClientSize.Height;
+        }
+
+        // The window is auto-scaled for the display DPI, so grow it by the designed ratio
+        // rather than to the 96-DPI pixel height, which is shorter than the collapsed
+        // window at 150% and above.
+        var height = expand
+            ? (int)Math.Round(_collapsedClientHeight * (ExpandedHeight / (double)CollapsedHeight))
+            : _collapsedClientHeight;
+        ClientSize = new Size(ClientSize.Width, height);
         _log.Visible = expand;
         _detailsToggle.Text = expand ? "Hide details" : "Show details";
         if (expand)
