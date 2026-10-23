@@ -248,6 +248,14 @@ test('saving edited metadata refreshes the mini player "Next:" line', async () =
     assert.equal(calls.peek, 1, 'the queued title shown as "Next:" must not go stale');
 });
 
+test('switching tracks re-renders the "Next:" line from the newly current track', () => {
+    // loadTrack commits the new queue while the previous track is still current, so the
+    // line rendered during that commit describes the old position (e.g. "Queue empty"
+    // when the previous track was last). It must be rendered again after the switch.
+    const playerSource = fs.readFileSync(new URL('../js/legacy/player.js', import.meta.url), 'utf8');
+    assert.match(playerSource, /normalizeRuntimeState\(\{ allowStopWhenQueueEmpty: false \}\);\s*renderMiniQueuePeek\(\);\s*logAction\('source-switch-finish'/);
+});
+
 test('narrow library list rows keep a readable title column instead of collapsing it', () => {
     const row = declarationsFor(/^\.library-track-item\[data-view="list"\]$/);
     assert.match(row, /flex-wrap:\s*wrap/, 'actions should be able to drop below the title');
